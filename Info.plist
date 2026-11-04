@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleDevelopmentRegion</key><string>zh-Hans</string>
+<key>CFBundleIdentifier</key><string>com.leohenshuai.hedan</string>
+<key>CFBundleName</key><string>核单</string>
+<key>CFBundleDisplayName</key><string>核单</string>
+<key>CFBundleExecutable</key><string>Hedan</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleShortVersionString</key><string>1.0</string>
+<key>CFBundleVersion</key><string>1</string>
+<key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+<key>MinimumOSVersion</key><string>14.0</string>
+<key>UILaunchScreen</key><dict/>
+<key>NSCameraUsageDescription</key><string>拍摄单据照片用于识别核对</string>
+<key>NSPhotoLibraryUsageDescription</key><string>选择单据照片用于识别核对</string>
+<key>UIDeviceFamily</key><array><integer>1</integer><integer>2</integer></array>
+<key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string></array>
+<key>CFBundleIcons</key><dict><key>CFBundlePrimaryIcon</key><dict><key>CFBundleIconFiles</key><array><string>AppIcon60x60</string><string>AppIcon40x40</string><string>AppIcon29x29</string></array><key>CFBundleIconName</key><string>AppIcon</string></dict></dict>
+<key>CFBundleIcons~ipad</key><dict><key>CFBundlePrimaryIcon</key><dict><key>CFBundleIconFiles</key><array><string>AppIcon76x76</string><string>AppIcon83.5x83.5</string></array><key>CFBundleIconName</key><string>AppIcon</string></dict></dict>
+</dict></plist>

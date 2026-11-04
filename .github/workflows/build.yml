@@ -1,0 +1,50 @@
+name: build
+permissions:
+  contents: write
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "发布到 Release（仅手动运行且勾选时生效）"
+        type: boolean
+        default: false
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build unsigned IPA
+        run: |
+          set -e
+          SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          mkdir -p build/Payload/Hedan.app
+          xcrun -sdk iphoneos swiftc -target arm64-apple-ios14.0 -sdk "$SDK" -O -o build/Payload/Hedan.app/Hedan Sources/main.swift
+          cp Info.plist build/Payload/Hedan.app/
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" build/Payload/Hedan.app/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.${{ github.run_number }}" build/Payload/Hedan.app/Info.plist
+          cp -R www build/Payload/Hedan.app/www
+          for spec in "60x60@2x:120" "60x60@3x:180" "76x76:76" "76x76@2x:152" "83.5x83.5@2x:167" "40x40@2x:80" "40x40@3x:120" "29x29@2x:58" "29x29@3x:87"; do
+            name="${spec%%:*}"; px="${spec##*:}"
+            sips -z "$px" "$px" www/icons/icon-1024.png --out "build/Payload/Hedan.app/AppIcon${name}.png"
+          done
+          cd build && zip -qr Hedan.ipa Payload && ls -l Hedan.ipa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Hedan-ipa
+          path: build/Hedan.ipa
+
+  release:
+    needs: build
+    if: github.event_name == 'workflow_dispatch' && inputs.release == true
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: Hedan-ipa
+          path: build
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ github.run_number }}" build/Hedan.ipa --title "Hedan build ${{ github.run_number }}" --notes "$(git log -1 --pretty=%s)"

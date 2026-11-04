@@ -1,0 +1,505 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>核单</title>
+<style>
+:root{
+  --bg:#eef1f6; --surface:#ffffff; --surface-2:#f5f7fb; --ink:#1b2430; --muted:#5b6472;
+  --rule:#c7d0dc; --rule-strong:#9fb0c6; --accent:#2451a3; --accent-soft:#e3ebf8;
+  --good:#1f7a4d; --good-soft:#e5f4ec; --bad:#c23b3b; --bad-soft:#fbeaea;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#12161f; --surface:#1a2030; --surface-2:#20273a; --ink:#e8ecf4; --muted:#9aa5b8;
+    --rule:#333e54; --rule-strong:#4a5878; --accent:#6f9be8; --accent-soft:#213257;
+    --good:#5cc994; --good-soft:#173427; --bad:#f08080; --bad-soft:#3a2124;
+    color-scheme:dark;
+  }
+}
+*{box-sizing:border-box;}
+body{background:var(--bg); color:var(--ink); font-family:'IBM Plex Sans', -apple-system, sans-serif; margin:0; padding:24px 16px 60px; max-width:980px; margin-inline:auto;}
+.num{font-family:'Space Mono','SF Mono',monospace; font-variant-numeric:tabular-nums;}
+h1{font-family:'Space Mono',monospace; font-size:1.5rem; margin:0 0 4px;}
+.sub{color:var(--muted); font-size:0.9rem; margin:0 0 22px;}
+
+.summary-bar{display:flex; gap:12px; flex-wrap:wrap; margin-bottom:24px;}
+.stat{background:var(--surface); border:1px solid var(--rule); border-radius:10px; padding:12px 16px; flex:1 1 140px; min-width:140px;}
+.stat .label{font-size:0.72rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:4px;}
+.stat .value{font-family:'Space Mono',monospace; font-size:1.25rem;}
+.stat.grand{border-color:var(--accent); background:var(--accent-soft);}
+.status-pill{display:inline-flex; align-items:center; gap:6px; font-family:'Space Mono',monospace; font-weight:700;}
+.status-pill.ok{color:var(--good);} .status-pill.err{color:var(--bad);}
+.dot{width:8px; height:8px; border-radius:50%; background:currentColor;}
+
+.ledger{background:var(--surface); border:1px solid var(--rule); border-radius:12px; margin-bottom:22px; overflow:hidden;}
+.ledger-head{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 18px; border-bottom:1px solid var(--rule); background:var(--surface-2); flex-wrap:wrap;}
+.ledger-head input.title{font-family:'Space Mono',monospace; font-size:1.05rem; background:transparent; border:none; color:var(--ink); width:160px;}
+.ledger-head input.title:focus{outline:1px solid var(--accent); border-radius:4px;}
+
+.photo-zone{padding:12px 18px; border-bottom:1px dashed var(--rule); display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start;}
+.photo-drop{border:1.5px dashed var(--rule-strong); border-radius:10px; padding:14px; text-align:center; color:var(--muted); font-size:0.82rem; cursor:pointer; flex:1 1 160px; min-width:160px; background:var(--surface-2);}
+.photo-drop:hover{border-color:var(--accent); color:var(--accent);}
+.photo-card{position:relative; width:110px;}
+.photo-card img{width:110px; height:110px; object-fit:cover; border-radius:8px; border:1px solid var(--rule); display:block; cursor:zoom-in;}
+.photo-card button.rm{position:absolute; top:-6px; right:-6px; width:20px; height:20px; border-radius:50%; border:none; background:var(--bad); color:#fff; font-size:12px; line-height:1; cursor:pointer; padding:0;}
+.photo-card .ocr-status{font-size:0.66rem; margin-top:4px; text-align:center; color:var(--muted);}
+.photo-card .ocr-status.busy{color:var(--accent);}
+.photo-card .ocr-status.ok{color:var(--good);}
+.photo-card .ocr-status.err{color:var(--bad);}
+.backend-bar{padding:8px 18px; border-bottom:1px dashed var(--rule); font-size:0.76rem; color:var(--muted); display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
+.backend-bar input{font-family:'Space Mono',monospace; font-size:0.76rem; padding:3px 6px; border:1px solid var(--rule); border-radius:5px; background:var(--surface-2); color:var(--ink); width:170px;}
+
+.table-scroll{overflow-x:auto;}
+table{width:100%; border-collapse:collapse; min-width:680px;}
+thead th{text-align:left; font-size:0.72rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); font-weight:600; padding:10px; border-bottom:1px solid var(--rule-strong); white-space:nowrap;}
+thead th.num-col{text-align:right;}
+tbody td{padding:6px 10px; border-bottom:1px solid var(--rule); vertical-align:middle;}
+tbody tr:hover{background:var(--surface-2);}
+td.num-col{text-align:right;}
+input.cell{width:60px; text-align:right; font-family:'Space Mono',monospace; font-size:0.88rem; color:var(--ink); background:var(--surface-2); border:1px solid var(--rule); border-radius:6px; padding:5px 6px;}
+input.cell:focus{outline:2px solid var(--accent); outline-offset:1px; border-color:var(--accent);}
+input.cell.wide{width:80px;}
+input.desc{width:100%; min-width:140px; font-family:inherit; font-size:0.88rem; color:var(--ink); background:var(--surface-2); border:1px solid var(--rule); border-radius:6px; padding:5px 8px;}
+input.printed{background:transparent; border-color:transparent; color:var(--muted);}
+input.printed:focus{background:var(--surface-2); border-color:var(--accent); color:var(--ink);}
+.computed{font-family:'Space Mono',monospace;}
+.badge{display:inline-block; font-family:'Space Mono',monospace; font-size:0.76rem; padding:2px 8px; border-radius:999px;}
+.badge.ok{background:var(--good-soft); color:var(--good);}
+.badge.bad{background:var(--bad-soft); color:var(--bad);}
+button.rmrow{border:none; background:transparent; color:var(--muted); cursor:pointer; font-size:1rem;}
+button.rmrow:hover{color:var(--bad);}
+tfoot td{padding:12px 10px; font-family:'Space Mono',monospace; font-weight:700; border-top:2px solid var(--rule-strong);}
+tfoot td.num-col{text-align:right;}
+
+.row-controls{padding:10px 18px; border-top:1px solid var(--rule);}
+.controls{display:flex; gap:10px; margin:6px 0 30px; flex-wrap:wrap;}
+button{font-family:'IBM Plex Sans',sans-serif; font-size:0.85rem; font-weight:600; padding:8px 14px; border-radius:8px; border:1px solid var(--rule-strong); background:var(--surface); color:var(--ink); cursor:pointer;}
+button:hover{border-color:var(--accent); color:var(--accent);}
+button.primary{background:var(--accent); border-color:var(--accent); color:#fff;}
+button.primary:hover{opacity:0.9; color:#fff;}
+button.ghost{border-style:dashed;}
+footer{color:var(--muted); font-size:0.8rem; padding-top:10px; border-top:1px solid var(--rule); text-align:center;}
+.lightbox{position:fixed; inset:0; background:rgba(0,0,0,0.8); display:none; align-items:center; justify-content:center; z-index:50; padding:24px;}
+.lightbox.show{display:flex;}
+.lightbox img{max-width:100%; max-height:100%; border-radius:8px;}
+.tip{font-size:0.76rem; color:var(--muted); padding:6px 18px 14px;}
+.import-zone{padding:12px 18px; border-bottom:1px dashed var(--rule);}
+.import-zone textarea{width:100%; min-height:70px; font-family:'Space Mono',monospace; font-size:0.82rem; padding:8px 10px; border:1px solid var(--rule); border-radius:8px; background:var(--surface-2); color:var(--ink); resize:vertical;}
+.import-zone .row{display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap;}
+.import-zone .hint{font-size:0.74rem; color:var(--muted);}
+.import-msg{font-size:0.78rem; margin-left:6px;}
+.import-zone{display:none}
+.import-msg.ok{color:var(--good);} .import-msg.bad{color:var(--bad);}
+</style>
+
+</head>
+<body>
+
+<h1>核单</h1>
+<p class="sub">拍照 → AI 识别填表 → 自动核对差额（识别结果请对照照片复核）</p>
+
+<div class="summary-bar" id="summaryBar"></div>
+
+<div class="backend-bar" style="flex-direction:column;align-items:stretch">
+<details id="cfg"><summary style="cursor:pointer;font-weight:600">⚙ AI 设置（Base URL / Key / 模型）</summary>
+<div style="display:grid;gap:6px;margin-top:8px">
+<input type="text" id="aiBase" placeholder="Base URL，如 https://api.openai.com/v1" style="width:100%">
+<input type="password" id="aiKey" placeholder="API Key" style="width:100%">
+<input type="text" id="aiModel" placeholder="模型名，需支持图片，如 gpt-4o" style="width:100%">
+<div><button id="aiTest">测试连接</button> <span id="aiMsg"></span></div>
+<div class="hint">Key 只存在本机；照片只在识别时发给你填的接口。</div></div></details></div>
+
+<div id="ledgers"></div>
+
+<div class="controls">
+  <button class="primary" id="addPageBtn">+ 新增一页</button>
+  <button id="clearDiffBtn">把"单据金额"设为当前计算值</button>
+</div>
+
+<footer>数据与照片仅保存在本机。</footer>
+
+<div class="lightbox" id="lightbox"><img id="lightboxImg" src=""></div>
+
+<script>try{window.__PRESEED__=JSON.parse(localStorage.hedanData||"null");}catch(e){window.__PRESEED__=null;}</script>
+<script>
+(function(){
+  var ledgersEl = document.getElementById('ledgers');
+  var summaryEl = document.getElementById('summaryBar');
+  var fmt = new Intl.NumberFormat('es-AR');
+  var pageCount = 0;
+
+  summaryEl.innerHTML =
+    '<div class="stat"><div class="label">计算总额</div><div class="value num" id="grandCalc">0</div></div>' +
+    '<div class="stat"><div class="label">单据总额</div><div class="value"><input class="cell wide printed" style="font-size:1.05rem;width:100%;" type="number" step="1" id="grandPrinted" value="0"></div></div>' +
+    '<div class="stat grand" style="display:flex;flex-direction:column;justify-content:center;"><div class="label">核对结果</div><div id="grandStatus" class="status-pill"></div></div>';
+  document.getElementById('grandPrinted').addEventListener('input', recalcAll);
+
+  function newPage(printedDefault){
+    pageCount++;
+    var pid = 'pg' + pageCount;
+    var wrap = document.createElement('section');
+    wrap.className = 'ledger';
+    wrap.id = pid;
+    ledgersEl.appendChild(wrap);
+
+    wrap.innerHTML =
+      '<div class="ledger-head">' +
+        '<input class="title" value="第 ' + pageCount + ' 页">' +
+        '<button class="rmrow" data-act="rmpage" style="font-size:1.1rem;">✕ 删除本页</button>' +
+      '</div>' +
+      '<div class="photo-zone">' +
+        '<label class="photo-drop">上传/拍照单据（留作对照）<br>点击选择图片<input type="file" accept="image/*" multiple style="display:none" data-act="filein"></label>' +
+        '<div class="photo-list" style="display:flex; gap:10px; flex-wrap:wrap;"></div>' +
+      '</div>' +
+      '<div class="import-zone">' +
+        '<div class="hint">把单据拍照发给 Claude，让它读出内容并按下面格式回复给你，然后粘贴到这里一键导入：</div>' +
+        '<div class="hint" style="margin:4px 0 6px;">格式：每行一项，用逗号分隔品名和数字，谁先谁后都行 —— 会自动把第一个数字当数量、最后两个数字当单价和金额（只有两个数字时，金额=数量×单价）。品名认不出来也没关系，留空一样能导入，核对主要看数字。Pyto 识别结果和手打的都能用。</div>' +
+        '<textarea placeholder="例如（品名在前）：\nFamiliar x580,2,4150,8300\nChico x400,3,2900,8700\n\n或（数量在前，Vision 识别常是这个顺序）：\n2,Familiar x580,4150,8300"></textarea>' +
+        '<div class="row"><button data-act="import">导入这些行</button><span class="import-msg"></span></div>' +
+      '</div>' +
+      '<div class="tip">导入后再对照照片核对一遍数字，确认无误。</div>' +
+      '<div class="table-scroll"><table>' +
+        '<thead><tr><th class="num-col">数量</th><th>描述</th><th class="num-col">单价</th><th class="num-col">计算金额</th><th class="num-col">单据金额</th><th class="num-col">差额</th><th></th></tr></thead>' +
+        '<tbody></tbody>' +
+        '<tfoot><tr><td colspan="3">页面合计</td>' +
+          '<td class="num-col" id="' + pid + '-calcTotal">0</td>' +
+          '<td class="num-col"><input class="cell wide printed" type="number" step="1" id="' + pid + '-printedTotal" value="' + (printedDefault||0) + '"></td>' +
+          '<td class="num-col" id="' + pid + '-totalDiff">–</td><td></td>' +
+        '</tr></tfoot>' +
+      '</table></div>' +
+      '<div class="row-controls"><button class="ghost" data-act="addrow">+ 添加一行</button></div>';
+
+    wrap.querySelector('[data-act="rmpage"]').addEventListener('click', function(){
+      wrap.remove(); recalcAll();
+    });
+    wrap.querySelector('[data-act="addrow"]').addEventListener('click', function(){
+      addRow(pid, {d:'', q:'', p:'', imp:''});
+    });
+    wrap.querySelector('[data-act="filein"]').addEventListener('change', function(e){
+      handleFiles(pid, e.target.files);
+      e.target.value = '';
+    });
+    wrap.querySelector('[data-act="import"]').addEventListener('click', function(){
+      importText(pid, wrap.querySelector('.import-zone textarea'), wrap.querySelector('.import-msg'));
+    });
+    document.getElementById(pid + '-printedTotal').addEventListener('input', recalcAll);
+
+    return pid;
+  }
+
+  function addRow(pid, item){
+    var tbody = document.querySelector('#' + pid + ' tbody');
+    var rid = pid + '-r' + (tbody.children.length + '-' + Date.now());
+    var tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td class="num-col"><input class="cell" type="number" step="1" id="' + rid + '-q" value="' + (item.q||'') + '"></td>' +
+      '<td><input class="desc" type="text" id="' + rid + '-d" value="' + (item.d||'') + '" placeholder="品名"></td>' +
+      '<td class="num-col"><input class="cell wide" type="number" step="1" id="' + rid + '-p" value="' + (item.p||'') + '"></td>' +
+      '<td class="num-col computed" id="' + rid + '-calc">0</td>' +
+      '<td class="num-col"><input class="cell wide printed" type="number" step="1" id="' + rid + '-imp" value="' + (item.imp||'') + '"></td>' +
+      '<td class="num-col" id="' + rid + '-diff">–</td>' +
+      '<td><button class="rmrow" title="删除此行">✕</button></td>';
+    tbody.appendChild(tr);
+    ['q','p','imp'].forEach(function(s){
+      document.getElementById(rid + '-' + s).addEventListener('input', recalcAll);
+    });
+    tr.querySelector('.rmrow').addEventListener('click', function(){ tr.remove(); recalcAll(); });
+    recalcAll();
+  }
+
+  function handleFiles(pid, files){
+    var list = document.querySelector('#' + pid + ' .photo-list');
+    if(!list.__seen) list.__seen = {};
+    Array.prototype.forEach.call(files, function(file){
+      // 同一张照片（文件名+大小+修改时间都一样）在这一页已经加过了，就不再重复上传/
+      // 重复识别——避免手滑选中两次同一张照片时，识别结果在导入框里被塞进去两遍。
+      var fp = file.name + '|' + file.size + '|' + (file.lastModified || 0);
+      if(list.__seen[fp]) return;
+      list.__seen[fp] = true;
+      var reader = new FileReader();
+      reader.onload = function(e){
+        var card = document.createElement('div');
+        card.className = 'photo-card';
+        card.innerHTML =
+          '<img src="' + e.target.result + '"><button class="rm" title="移除">✕</button>' +
+          '<div class="ocr-status"></div>';
+        list.appendChild(card);
+        card.querySelector('img').addEventListener('click', function(){
+          document.getElementById('lightboxImg').src = e.target.result;
+          document.getElementById('lightbox').classList.add('show');
+        });
+        card.querySelector('.rm').addEventListener('click', function(){ card.remove(); });
+        sendToBackend(pid, file, card.querySelector('.ocr-status'), e.target.result);
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // POST the raw image bytes to the local Pyto OCR backend; on success, append the
+  // recognized text into this page's import textarea so the user can review + import.
+  var __cbs={};
+  window.__nativeReply=function(id,o){var f=__cbs[id];if(f){delete __cbs[id];f(o);}};
+  function httpPost(url,headers,body){
+    if(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.native){
+      return new Promise(function(res){var id='h'+Date.now()+Math.random();__cbs[id]=res;
+        window.webkit.messageHandlers.native.postMessage({id:id,url:url,headers:headers,body:body});});
+    }
+    return fetch(url,{method:'POST',headers:headers,body:body}).then(function(r){return r.text().then(function(t){return {ok:true,status:r.status,text:t};});})
+      .catch(function(e){return {ok:false,error:e.message};});
+  }
+  function cfg(){return {base:(localStorage.aiBase||'').trim().replace(/\/+$/,''),key:(localStorage.aiKey||'').trim(),model:(localStorage.aiModel||'').trim()};}
+  function aiCall(messages){
+    var c=cfg();
+    if(!c.base||!c.key||!c.model) return Promise.reject(new Error('请先在「AI 设置」填 Base URL / Key / 模型'));
+    var url=/\/chat\/completions$/.test(c.base)?c.base:c.base+'/chat/completions';
+    return httpPost(url,{'Content-Type':'application/json','Authorization':'Bearer '+c.key},
+      JSON.stringify({model:c.model,messages:messages,temperature:0})).then(function(r){
+        if(!r.ok) throw new Error(r.error||'网络错误');
+        var j; try{j=JSON.parse(r.text);}catch(e){throw new Error('HTTP '+r.status+' '+r.text.slice(0,120));}
+        if(r.status>=300) throw new Error('HTTP '+r.status+' '+((j.error&&j.error.message)||r.text.slice(0,120)));
+        return j.choices[0].message.content;
+      });
+  }
+  var PROMPT='你是手写订货单/送货单(Nota de Pedido, 阿根廷, 西班牙语)识别器。读图，只输出一个 JSON，不要解释、不要代码块。格式：'+
+   '{"date":"日期","customer":"客户名或空","rows":[{"d":"品名","q":数量,"p":单价,"imp":单据上写的金额}],"total":页底TOTAL金额,"unsure":[有疑问的行序号从0起]}。'+
+   '规则：1)数字用整数，千分点去掉(21.920=21920)。2)被划掉/没有金额的行不要输出。3)只照抄单据上写的数，绝不自己计算或纠正；看不清的 imp 或 p 就填 null 并把行号放进 unsure。'+
+   '4)底部若有小计、IVA 等单独的金额行，不要放进 rows，只把最终 TOTAL 填 total。5)圈起来的小数字是标记，不是数量。';
+  function shrink(dataUrl,max){
+    return new Promise(function(res){var im=new Image();im.onload=function(){
+      var k=Math.min(1,max/Math.max(im.width,im.height));var c=document.createElement('canvas');
+      c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+      res(c.toDataURL('image/jpeg',0.85));};im.src=dataUrl;});
+  }
+  function sendToBackend(pid, file, statusEl, dataUrl){
+    statusEl.className='ocr-status busy'; statusEl.textContent='AI 识别中…';
+    shrink(dataUrl,1800).then(function(img){
+      return aiCall([{role:'user',content:[{type:'text',text:PROMPT},{type:'image_url',image_url:{url:img}}]}]);
+    }).then(function(txt){
+      var m=txt.match(/\{[\s\S]*\}/); if(!m) throw new Error('返回里没有 JSON：'+txt.slice(0,80));
+      var o=JSON.parse(m[0]); var rows=o.rows||[]; var uns=o.unsure||[];
+      var wrap=document.getElementById(pid);
+      var tb=wrap.querySelector('tbody');
+      Array.prototype.slice.call(tb.children).forEach(function(tr){var q=tr.querySelector('input[id$="-q"]').value,p=tr.querySelector('input[id$="-p"]').value,d=tr.querySelector('input.desc').value; if(!q&&!p&&!d) tr.remove();});
+      var start=tb.children.length;
+      rows.forEach(function(r,i){
+        addRow(pid,{d:r.d||'',q:r.q,p:r.p,imp:r.imp});
+        if(uns.indexOf(i)>=0||r.p==null||r.imp==null) tb.children[start+i].style.background='rgba(255,200,0,.25)';
+      });
+      if(o.total!=null) document.getElementById(pid+'-printedTotal').value=o.total;
+      var t=wrap.querySelector('.ledger-head input.title');
+      if(t&&(o.customer||o.date)) t.value=[o.customer,o.date].filter(Boolean).join(' · ');
+      var g=0;document.querySelectorAll('.ledger [id$="-printedTotal"]').forEach(function(x){g+=parseFloat(x.value)||0;});
+      document.getElementById('grandPrinted').value=g;
+      recalcAll();
+      statusEl.className='ocr-status ok'; statusEl.textContent='已识别 '+rows.length+' 行'+(uns.length?'（黄色行请复核）':'');
+    }).catch(function(err){statusEl.className='ocr-status err';statusEl.textContent='识别失败：'+err.message;});
+  }
+
+  // 不假设"品名"和"数量"谁在前谁在后——按每个逗号分隔的片段自动分类：
+  // 整段"从头到尾全是数字"的进 nums（避免把 "x580" 这种品名里夹的数字
+  // 误判成金额），其余（品名、勾号✓、杠线之类的识别噪音）进 words。
+  // 数字按出现顺序：第一个当数量，最后两个当单价、金额（只有两个数字时，
+  // 金额 = 数量×单价）。品名认不出来没关系，核对靠的是数字——只要这一行
+  // 凑出数字就留下，品名留空，之后自己对照照片补/不补都行。
+  function parseImportLine(line){
+    var parts = line.split(/[,，;；]+/).map(function(s){ return s.trim(); }).filter(function(s){ return s !== ''; });
+    var nums = [], words = [];
+    parts.forEach(function(tok){
+      if(/^-?\d+(\.\d+)?$/.test(tok)){
+        nums.push(parseFloat(tok));
+      } else {
+        words.push(tok);
+      }
+    });
+    if(nums.length === 0) return null; // 一个数字都没有，没法核对，跳过
+    var d = words.join(' ').trim();
+    var q, p, imp;
+    if(nums.length >= 3){
+      q = nums[0]; p = nums[nums.length - 2]; imp = nums[nums.length - 1];
+    } else if(nums.length === 2){
+      q = nums[0]; p = nums[1]; imp = q * p;
+    } else {
+      q = nums[0]; p = 0; imp = 0;
+    }
+    return { d: d, q: q, p: p, imp: imp };
+  }
+
+  function importText(pid, textarea, msgEl){
+    var raw = textarea.value.trim();
+    if(!raw){ msgEl.className = 'import-msg bad'; msgEl.textContent = '请先粘贴内容'; return; }
+    var lines = raw.split('\n').map(function(l){ return l.trim(); }).filter(Boolean);
+    // 按"解析出来的内容"（品名+数量+单价+金额）去重，而不是按原始文字去重——
+    // 拍同一张照片识别两次，或单据本身有两份一样的联单，识别出来的噪音符号
+    // 未必逐字相同，但真正的数据是一样的，这样也能挡住。
+    var seen = {};
+    var added = 0, skipped = 0, duped = 0;
+    lines.forEach(function(line){
+      var row = parseImportLine(line);
+      if(!row){ skipped++; return; }
+      var key = row.d.toLowerCase().replace(/\s+/g,'') + '|' + row.q + '|' + row.p + '|' + row.imp;
+      if(seen[key]){ duped++; return; }
+      seen[key] = true;
+      addRow(pid, row);
+      added++;
+    });
+    if(added){
+      var extras = [];
+      if(duped) extras.push('去掉 ' + duped + ' 行重复的');
+      if(skipped) extras.push('跳过 ' + skipped + ' 行一个数字都没有的');
+      msgEl.className = 'import-msg ok';
+      msgEl.textContent = '已导入 ' + added + ' 行' + (extras.length ? '，' + extras.join('，') : '') + '，请核对数量和金额是否正确';
+      textarea.value = '';
+    } else {
+      msgEl.className = 'import-msg bad';
+      msgEl.textContent = '没能解析出任何一行，每行至少要有一个数字';
+    }
+  }
+
+  document.getElementById('lightbox').addEventListener('click', function(){
+    this.classList.remove('show');
+  });
+
+  function recalcAll(){
+    var grandCalc = 0;
+    var grandPrinted = parseFloat(document.getElementById('grandPrinted').value) || 0;
+    var allOk = true;
+    var anyRow = false;
+
+    document.querySelectorAll('.ledger').forEach(function(wrap){
+      var pid = wrap.id;
+      var pageCalc = 0;
+      wrap.querySelectorAll('tbody tr').forEach(function(tr){
+        anyRow = true;
+        var qInput = tr.querySelector('input.cell:nth-of-type(1), input[id$="-q"]');
+        var pInput = tr.querySelector('input[id$="-p"]');
+        var impInput = tr.querySelector('input[id$="-imp"]');
+        var calcCell = tr.querySelector('[id$="-calc"]');
+        var diffCell = tr.querySelector('[id$="-diff"]');
+        var q = parseFloat(qInput.value) || 0;
+        var p = parseFloat(pInput.value) || 0;
+        var imp = impInput.value === '' ? null : (parseFloat(impInput.value) || 0);
+        var calc = q * p;
+        pageCalc += calc;
+        calcCell.textContent = fmt.format(calc);
+        if(imp === null){
+          diffCell.innerHTML = '<span class="badge">待填</span>';
+        } else {
+          var diff = calc - imp;
+          if(diff === 0){
+            diffCell.innerHTML = '<span class="badge ok">✓ 一致</span>';
+          } else {
+            diffCell.innerHTML = '<span class="badge bad">' + (diff > 0 ? '+' : '') + fmt.format(diff) + '</span>';
+            allOk = false;
+          }
+        }
+      });
+
+      grandCalc += pageCalc;
+      var calcTotalEl = document.getElementById(pid + '-calcTotal');
+      if(calcTotalEl) calcTotalEl.textContent = fmt.format(pageCalc);
+      var printedTotalInput = document.getElementById(pid + '-printedTotal');
+      var totalDiffCell = document.getElementById(pid + '-totalDiff');
+      if(printedTotalInput && totalDiffCell){
+        var printedTotal = parseFloat(printedTotalInput.value) || 0;
+        var totalDiff = pageCalc - printedTotal;
+        if(totalDiff === 0){
+          totalDiffCell.innerHTML = '<span class="badge ok">✓ 相符</span>';
+        } else {
+          totalDiffCell.innerHTML = '<span class="badge bad">' + (totalDiff > 0 ? '+' : '') + fmt.format(totalDiff) + '</span>';
+          allOk = false;
+        }
+      }
+    });
+
+    document.getElementById('grandCalc').textContent = fmt.format(grandCalc);
+    var grandDiff = grandCalc - grandPrinted;
+    var statusEl = document.getElementById('grandStatus');
+    if(!anyRow){
+      statusEl.className = 'status-pill';
+      statusEl.innerHTML = '<span class="dot"></span>等待录入';
+    } else if(grandDiff === 0 && allOk){
+      statusEl.className = 'status-pill ok';
+      statusEl.innerHTML = '<span class="dot"></span>全部核对通过';
+    } else {
+      statusEl.className = 'status-pill err';
+      statusEl.innerHTML = '<span class="dot"></span>差 ' + (grandDiff > 0 ? '+' : '') + fmt.format(grandDiff);
+    }
+  }
+
+  document.getElementById('addPageBtn').addEventListener('click', function(){
+    var pid = newPage(0);
+    addRow(pid, {d:'', q:'', p:'', imp:''});
+  });
+
+  document.getElementById('clearDiffBtn').addEventListener('click', function(){
+    document.querySelectorAll('.ledger').forEach(function(wrap){
+      var pid = wrap.id;
+      var pageCalc = 0;
+      wrap.querySelectorAll('tbody tr').forEach(function(tr){
+        var q = parseFloat(tr.querySelector('input[id$="-q"]').value) || 0;
+        var p = parseFloat(tr.querySelector('input[id$="-p"]').value) || 0;
+        var impInput = tr.querySelector('input[id$="-imp"]');
+        impInput.value = q * p;
+        pageCalc += q * p;
+      });
+      var pt = document.getElementById(pid + '-printedTotal');
+      if(pt) pt.value = pageCalc;
+    });
+    var gc = document.getElementById('grandCalc').textContent.replace(/,/g,'');
+    document.getElementById('grandPrinted').value = gc;
+    recalcAll();
+  });
+
+  // If a Pyto session pre-seeded OCR text (one page per photo, raw text in the import box),
+  // build those pages; otherwise start with a single blank page.
+  if (window.__PRESEED__ && window.__PRESEED__.length) {
+    // v2：预置数据支持逐行填充（item.rows），并写入单据总额；照片可内嵌为 item.photo
+    var grand = 0;
+    window.__PRESEED__.forEach(function(item){
+      var pid = newPage(item.printed || 0);
+      grand += (item.printed || 0);
+      var titleInput = document.querySelector('#' + pid + ' .ledger-head input.title');
+      if (titleInput && item.title) titleInput.value = item.title;
+      var ta = document.querySelector('#' + pid + ' .import-zone textarea');
+      if (ta) ta.value = item.text || '';
+      var rows = item.rows || [];
+      if (item.photo) {
+        var pl = document.querySelector('#' + pid + ' .photo-list');
+        pl.innerHTML = '<div class="photo-card"><img src="' + item.photo + '"></div>';
+      }
+      rows.forEach(function(r){ addRow(pid, r); });
+      if (!rows.length) addRow(pid, {d:'', q:'', p:'', imp:''});
+    });
+    document.getElementById('grandPrinted').value = grand;
+    recalcAll();
+    window.__READY__ = true;
+  } else {
+    var firstPid = newPage(0);
+    addRow(firstPid, {d:'', q:'', p:'', imp:''});
+  }
+
+  ['aiBase','aiKey','aiModel'].forEach(function(k){var el=document.getElementById(k);el.value=localStorage[k]||'';el.addEventListener('input',function(){localStorage[k]=el.value;});});
+  if(!cfg().base) document.getElementById('cfg').open=true;
+  document.getElementById('aiTest').addEventListener('click',function(){
+    var m=document.getElementById('aiMsg');m.textContent='测试中…';
+    aiCall([{role:'user',content:'回复 ok'}]).then(function(t){m.textContent='✓ 连通：'+t.slice(0,20);}).catch(function(e){m.textContent='✗ '+e.message;});
+  });
+  // 本机保存：页面数据 + 缩略图
+  function snap(){
+    var out=[];document.querySelectorAll('.ledger').forEach(function(w){
+      var pid=w.id,rows=[];
+      w.querySelectorAll('tbody tr').forEach(function(tr){rows.push({d:tr.querySelector('input.desc').value,q:tr.querySelector('input[id$="-q"]').value,p:tr.querySelector('input[id$="-p"]').value,imp:tr.querySelector('input[id$="-imp"]').value});});
+      var im=w.querySelector('.photo-card img');
+      out.push({title:w.querySelector('input.title').value,printed:parseFloat(document.getElementById(pid+'-printedTotal').value)||0,rows:rows,photo:im?im.src:''});
+    });return out;
+  }
+  window.__saveSnap=function(){try{localStorage.hedanData=JSON.stringify(snap());}catch(e){}};
+  document.addEventListener('input',function(){clearTimeout(window.__st);window.__st=setTimeout(window.__saveSnap,500);});
+  document.addEventListener('click',function(){clearTimeout(window.__st);window.__st=setTimeout(window.__saveSnap,800);});
+  var nb=document.createElement('button');nb.textContent='清空全部，开始新单';nb.style.marginLeft='8px';
+  nb.onclick=function(){if(confirm('清空当前所有页面？')){localStorage.removeItem('hedanData');location.reload();}};
+  document.querySelector('.controls').appendChild(nb);
+  setTimeout(window.__saveSnap,1500);
+})();
+</script>
+
+</body></html>
