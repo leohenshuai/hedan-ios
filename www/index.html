@@ -213,13 +213,39 @@ footer{margin-top:8px; padding-bottom:12px;}
   .badge{padding:2px 6px; font-size:.7rem;}
   .badge .bt{display:none;}
   button.rmrow{padding:2px 0; font-size:.9rem;}
-  tbody tr[style*="background"] td{background:inherit;}
-  tfoot td{font-size:.8rem; padding:9px 2px; border-top:1px solid var(--rule-strong); border-bottom:none; background:var(--accent-soft);}
+    tfoot td{font-size:.8rem; padding:9px 2px; border-top:1px solid var(--rule-strong); border-bottom:none; background:var(--accent-soft);}
   tfoot td:first-child{border-radius:14px 0 0 14px; padding-left:10px; text-align:left!important;}
   tfoot td:last-child{border-radius:0 14px 14px 0;}
   tfoot td:empty{display:table-cell;}
   tfoot td[colspan]{width:auto;}
   .ledger-head{padding:12px 14px;} .photo-zone{padding:12px 14px;}
+}
+
+/* ===== 表格 v3：去框、斑马纹、异常行高亮 ===== */
+@media (max-width:640px){
+  .table-scroll{padding:0 8px 6px;}
+  table{background:var(--surface-2); border-radius:18px; overflow:hidden; border:1px solid var(--rule);}
+  thead th{background:rgba(120,130,160,.14); font-size:.64rem; color:var(--muted); padding:9px 2px 8px; border-bottom:1px solid var(--rule);}
+  tbody td{border-bottom:1px solid var(--rule); padding:0 1px; height:38px;}
+  tbody tr:nth-child(even) td{background:rgba(120,130,160,.07);}
+  tbody tr:last-child td{border-bottom:none;}
+  /* 单元格里的输入框：平时像纯文字，点击才出框 */
+  tbody input.cell,tbody input.desc{background:transparent!important; border:1px solid transparent!important; box-shadow:none!important; border-radius:8px; height:30px;}
+  tbody input.cell:focus,tbody input.desc:focus{background:var(--surface)!important; border-color:var(--accent)!important; box-shadow:0 0 0 3px var(--accent-soft)!important;}
+  tbody input.desc{font-weight:500;}
+  tbody input.printed{color:var(--muted);}
+  td.computed{font-weight:600;}
+  /* 异常行：左侧色条 + 淡底色 */
+  tbody tr.bad td{background:rgba(255,69,58,.12)!important;}
+  tbody tr.bad td:first-child{box-shadow:inset 3px 0 0 var(--bad);}
+  tbody tr.warn td{background:rgba(255,200,0,.18)!important;}
+  tbody tr.warn td:first-child{box-shadow:inset 3px 0 0 #ffb300;}
+  tbody tr.iva td{background:rgba(10,132,255,.14)!important;}
+  tbody tr.iva td:first-child{box-shadow:inset 3px 0 0 var(--accent);}
+  .badge{min-width:28px; text-align:center;}
+  button.rmrow{opacity:.55;}
+  tfoot td{background:var(--accent-soft)!important; border-top:1px solid var(--rule-strong); border-radius:0!important; font-size:.82rem; padding:10px 1px;}
+  tfoot td:first-child{padding-left:12px;}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important;}}
 </style>
@@ -427,7 +453,7 @@ footer{margin-top:8px; padding-bottom:12px;}
       var start=tb.children.length;
       rows.forEach(function(r,i){
         addRow(pid,{d:r.d||'',q:r.q,p:r.p,imp:r.imp});
-        if(uns.indexOf(i)>=0||r.p==null||r.imp==null) tb.children[start+i].style.background='rgba(255,200,0,.25)';
+        if(uns.indexOf(i)>=0||r.p==null||r.imp==null) tb.children[start+i].classList.add('warn');
       });
       if(o.total!=null) document.getElementById(pid+'-printedTotal').value=o.total;
       var calc=0; rows.forEach(function(r){calc+=(Number(r.q)||0)*(Number(r.p)||0);});
@@ -437,9 +463,9 @@ footer{margin-top:8px; padding-bottom:12px;}
       if(hasIva){
         var calcIva=Math.round(calc*0.21), amt=(ivaW!=null&&ivaW>0)?ivaW:((tot>calc)?(tot-calc):calcIva);
         addRow(pid,{d:'IVA 21%',q:1,p:amt,imp:amt});
-        var ir=tb.lastElementChild; ir.style.background='rgba(10,132,255,.16)';
+        var ir=tb.lastElementChild; ir.classList.add('iva');
         var off=Math.abs(amt-calcIva)>1;
-        if(off) ir.style.background='rgba(255,200,0,.25)';
+        if(off){ir.classList.remove('iva');ir.classList.add('warn');}
         ivaMsg='有 IVA，已自动加入 '+fmt.format(amt)+(off?'（与 21% 不符，请复核）':'');
       } else { ivaMsg='单据没有 IVA'; }
       window.__ivaMsg=ivaMsg;
@@ -539,6 +565,8 @@ footer{margin-top:8px; padding-bottom:12px;}
         var calc = q * p;
         pageCalc += calc;
         calcCell.textContent = fmt.format(calc);
+        tr.classList.remove('bad');
+        if(imp!==null && calc-imp!==0) tr.classList.add('bad');
         if(imp === null){
           diffCell.innerHTML = '<span class="badge">–</span>';
         } else {
