@@ -90,7 +90,7 @@ final class VC: UIViewController, WKScriptMessageHandler, WKUIDelegate, UNUserNo
     }
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent n: UNNotification, withCompletionHandler h: @escaping (UNNotificationPresentationOptions) -> Void) {
-        h([.banner, .sound])
+        h([.banner, .list, .sound])
     }
 
     func webView(_ w: WKWebView, runJavaScriptAlertPanelWithMessage m: String, initiatedByFrame f: WKFrameInfo, completionHandler: @escaping () -> Void) {

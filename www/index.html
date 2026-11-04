@@ -437,6 +437,7 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
     var t=document.getElementById('toast');
     if(!t){t=document.createElement('div');t.id='toast';document.body.appendChild(t);}
     t.innerHTML='<b>'+title+'</b><span>'+body+'</span>'; t.className='show'+(/有 IVA/.test(body)?' iva':'');
+    try{window.webkit.messageHandlers.native.postMessage({op:'notify',title:title,body:body});}catch(e){}
     clearTimeout(window.__tt); window.__tt=setTimeout(function(){t.className='';},6000);
   }
   var PROMPT='你是手写订货单/送货单(Nota de Pedido, 阿根廷, 西班牙语)识别器。读图，只输出一个 JSON，不要解释、不要代码块。格式：'+
