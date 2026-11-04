@@ -184,9 +184,9 @@ button.rmrow{background:transparent!important; border:none!important; box-shadow
 .controls button.danger{color:var(--bad);}
 footer{margin-top:8px; padding-bottom:12px;}
 #toast{position:fixed; left:14px; right:14px; top:calc(env(safe-area-inset-top,0px) + 10px); z-index:99; padding:14px 18px; border-radius:24px;
-  background:var(--glass-solid); border:1px solid var(--edge); box-shadow:var(--shadow); -webkit-backdrop-filter:blur(20px); backdrop-filter:blur(20px);
+  background:var(--toast-bg); border:1px solid var(--edge); box-shadow:var(--shadow); -webkit-backdrop-filter:blur(20px); backdrop-filter:blur(20px);
   display:flex; flex-direction:column; gap:2px; transform:translateY(-140%); transition:transform .55s var(--spring); pointer-events:none;}
-#toast.show{transform:none;} #toast b{font-size:.95rem;} #toast span{font-size:.82rem; color:var(--muted);}
+#toast.show{transform:none;} #toast b{font-size:.95rem; color:var(--ink);} #toast span{font-size:.82rem; color:var(--muted);}
 /* 手机：紧凑表格，不横向滚动 */
 @media (max-width:640px){
   .table-scroll{overflow:visible; padding:0 6px 4px;}
@@ -247,6 +247,16 @@ footer{margin-top:8px; padding-bottom:12px;}
   tfoot td{background:var(--accent-soft)!important; border-top:1px solid var(--rule-strong); border-radius:0!important; font-size:.82rem; padding:10px 1px;}
   tfoot td:first-child{padding-left:12px;}
 }
+
+/* ===== IVA 行：蓝色 ===== */
+:root{--toast-bg:rgba(255,255,255,.96);}
+@media (prefers-color-scheme: dark){:root{--toast-bg:rgba(24,30,48,.97);}}
+tbody tr.iva td{background:rgba(10,132,255,.20)!important; color:var(--accent)!important; font-weight:700;}
+tbody tr.iva td:first-child{box-shadow:inset 4px 0 0 var(--accent);}
+tbody tr.iva input{color:var(--accent)!important; font-weight:700;}
+tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
+#toast.iva{border-color:var(--accent); box-shadow:0 10px 30px rgba(10,132,255,.35);}
+#toast.iva b{color:var(--accent);}
 @media (prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important;}}
 </style>
 
@@ -426,9 +436,8 @@ footer{margin-top:8px; padding-bottom:12px;}
   function notify(title,body){
     var t=document.getElementById('toast');
     if(!t){t=document.createElement('div');t.id='toast';document.body.appendChild(t);}
-    t.innerHTML='<b>'+title+'</b><span>'+body+'</span>'; t.className='show';
+    t.innerHTML='<b>'+title+'</b><span>'+body+'</span>'; t.className='show'+(/有 IVA/.test(body)?' iva':'');
     clearTimeout(window.__tt); window.__tt=setTimeout(function(){t.className='';},6000);
-    try{window.webkit.messageHandlers.native.postMessage({op:'notify',title:title,body:body});}catch(e){}
   }
   var PROMPT='你是手写订货单/送货单(Nota de Pedido, 阿根廷, 西班牙语)识别器。读图，只输出一个 JSON，不要解释、不要代码块。格式：'+
    '{"date":"日期","customer":"客户名或空","rows":[{"d":"品名","q":数量,"p":单价,"imp":单据上写的金额}],"subtotal":IVA之前的小计或null,"iva":单据上写出的IVA金额或null,"hasIva":单据是否加了IVA(true/false),"total":页底TOTAL金额,"unsure":[有疑问的行序号从0起]}。'+
@@ -465,7 +474,7 @@ footer{margin-top:8px; padding-bottom:12px;}
         addRow(pid,{d:'IVA 21%',q:1,p:amt,imp:amt});
         var ir=tb.lastElementChild; ir.classList.add('iva');
         var off=Math.abs(amt-calcIva)>1;
-        if(off){ir.classList.remove('iva');ir.classList.add('warn');}
+        
         ivaMsg='有 IVA，已自动加入 '+fmt.format(amt)+(off?'（与 21% 不符，请复核）':'');
       } else { ivaMsg='单据没有 IVA'; }
       window.__ivaMsg=ivaMsg;
@@ -565,6 +574,7 @@ footer{margin-top:8px; padding-bottom:12px;}
         var calc = q * p;
         pageCalc += calc;
         calcCell.textContent = fmt.format(calc);
+        tr.classList.toggle('iva', /^\s*iva\b/i.test(tr.querySelector('input.desc').value));
         tr.classList.remove('bad');
         if(imp!==null && calc-imp!==0) tr.classList.add('bad');
         if(imp === null){
