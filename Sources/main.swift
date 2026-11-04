@@ -29,18 +29,23 @@ final class VC: UIViewController, WKScriptMessageHandler, WKUIDelegate {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = UIColor(red: 0.93, green: 0.945, blue: 0.965, alpha: 1)
+        let bgc = UIColor { t in t.userInterfaceStyle == .dark ? UIColor(red: 0.02, green: 0.027, blue: 0.05, alpha: 1) : UIColor(red: 0.914, green: 0.933, blue: 0.984, alpha: 1) }
+        view.backgroundColor = bgc
         let cfg = WKWebViewConfiguration()
         let www = Bundle.main.bundleURL.appendingPathComponent("www")
         cfg.setURLSchemeHandler(SchemeHandler(root: www), forURLScheme: "app")
         cfg.userContentController.add(self, name: "native")
         web = WKWebView(frame: .zero, configuration: cfg)
+        web.isOpaque = false
+        web.backgroundColor = .clear
+        web.scrollView.backgroundColor = .clear
+        web.scrollView.contentInsetAdjustmentBehavior = .never
         web.uiDelegate = self
         web.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(web)
         let g = view.safeAreaLayoutGuide
         NSLayoutConstraint.activate([
-            web.topAnchor.constraint(equalTo: g.topAnchor),
+            web.topAnchor.constraint(equalTo: view.topAnchor),
             web.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             web.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             web.trailingAnchor.constraint(equalTo: view.trailingAnchor)])

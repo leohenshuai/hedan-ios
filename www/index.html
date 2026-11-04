@@ -90,6 +90,8 @@ footer{color:var(--muted); font-size:0.8rem; padding-top:10px; border-top:1px so
 .import-zone{display:none}
 .import-msg.ok{color:var(--good);} .import-msg.bad{color:var(--bad);}
 /* ===== iOS 26 Liquid Glass ===== */
+:root{padding-top:0!important;}
+body{padding-top:calc(env(safe-area-inset-top,0px) + 14px)!important;}
 :root{
   --bg:#e9eefb; --surface:rgba(255,255,255,.55); --surface-2:rgba(255,255,255,.45); --ink:#10141f; --muted:#5d6678;
   --rule:rgba(120,130,160,.22); --rule-strong:rgba(120,130,160,.35); --accent:#0a84ff; --accent-soft:rgba(10,132,255,.14);
@@ -220,7 +222,7 @@ footer{margin-top:8px; padding-bottom:12px;}
 <div style="display:grid;gap:6px;margin-top:8px">
 <input type="text" id="aiBase" placeholder="Base URL，如 https://api.openai.com/v1" style="width:100%">
 <input type="password" id="aiKey" placeholder="API Key" style="width:100%">
-<input type="text" id="aiModel" placeholder="模型名，需支持图片，如 gpt-4o" style="width:100%">
+<input type="text" id="aiModel" placeholder="必须是视觉模型，如 gpt-4o / gemini-2.5-flash / qwen-vl（deepseek 不支持图片）" style="width:100%">
 <div><button id="aiTest">测试连接</button> <span id="aiMsg"></span></div>
 <div class="hint">Key 只存在本机；照片只在识别时发给你填的接口。</div></div></details></div>
 
@@ -407,7 +409,7 @@ footer{margin-top:8px; padding-bottom:12px;}
       document.getElementById('grandPrinted').value=g;
       recalcAll();
       statusEl.className='ocr-status ok'; statusEl.textContent='已识别 '+rows.length+' 行'+(uns.length?'（黄色行请复核）':'');
-    }).catch(function(err){statusEl.className='ocr-status err';statusEl.textContent='识别失败：'+err.message;});
+    }).catch(function(err){statusEl.className='ocr-status err';statusEl.textContent='识别失败：'+err.message+(/超时|timed out/i.test(err.message)?'（该接口可能不支持图片，请换视觉模型并点「测试连接」确认）':'');});
   }
 
   // 不假设"品名"和"数量"谁在前谁在后——按每个逗号分隔的片段自动分类：
@@ -596,8 +598,13 @@ footer{margin-top:8px; padding-bottom:12px;}
   ['aiBase','aiKey','aiModel'].forEach(function(k){var el=document.getElementById(k);el.value=localStorage[k]||'';el.addEventListener('input',function(){localStorage[k]=el.value;});});
   if(!cfg().base) document.getElementById('cfg').open=true;
   document.getElementById('aiTest').addEventListener('click',function(){
-    var m=document.getElementById('aiMsg');m.textContent='测试中…';
-    aiCall([{role:'user',content:'回复 ok'}]).then(function(t){m.textContent='✓ 连通：'+t.slice(0,20);}).catch(function(e){m.textContent='✗ '+e.message;});
+    var m=document.getElementById('aiMsg');m.textContent='测试中（含图片）…';
+    var c=document.createElement('canvas');c.width=240;c.height=90;var x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,240,90);x.fillStyle='#000';x.font='bold 56px sans-serif';x.fillText('7421',40,66);
+    var t0=Date.now();
+    aiCall([{role:'user',content:[{type:'text',text:'图里的数字是多少？只回答数字。'},{type:'image_url',image_url:{url:c.toDataURL('image/png')}}]}]).then(function(t){
+      var sec=Math.round((Date.now()-t0)/1000);
+      m.textContent=/7421/.test(t)?('✓ 支持图片（'+sec+' 秒）'):('✗ 能连通但没读出图片，该模型可能不支持视觉：'+t.slice(0,30));
+    }).catch(function(e){m.textContent='✗ '+e.message;});
   });
   // 本机保存：页面数据 + 缩略图
   function snap(){
