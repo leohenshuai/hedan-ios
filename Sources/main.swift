@@ -1,5 +1,6 @@
 import UIKit
 import WebKit
+import UserNotifications
 
 final class SchemeHandler: NSObject, WKURLSchemeHandler {
     let root: URL
@@ -24,13 +25,14 @@ final class SchemeHandler: NSObject, WKURLSchemeHandler {
     func webView(_ webView: WKWebView, stop task: WKURLSchemeTask) {}
 }
 
-final class VC: UIViewController, WKScriptMessageHandler, WKUIDelegate {
+final class VC: UIViewController, WKScriptMessageHandler, WKUIDelegate, UNUserNotificationCenterDelegate {
     var web: WKWebView!
 
     override func viewDidLoad() {
         super.viewDidLoad()
         let bgc = UIColor { t in t.userInterfaceStyle == .dark ? UIColor(red: 0.02, green: 0.027, blue: 0.05, alpha: 1) : UIColor(red: 0.914, green: 0.933, blue: 0.984, alpha: 1) }
         view.backgroundColor = bgc
+        UNUserNotificationCenter.current().delegate = self
         let cfg = WKWebViewConfiguration()
         let www = Bundle.main.bundleURL.appendingPathComponent("www")
         cfg.setURLSchemeHandler(SchemeHandler(root: www), forURLScheme: "app")
@@ -54,7 +56,19 @@ final class VC: UIViewController, WKScriptMessageHandler, WKUIDelegate {
 
     // JS -> 原生 HTTP（绕开 CORS）：{id, url, headers, body}
     func userContentController(_ c: WKUserContentController, didReceive m: WKScriptMessage) {
-        guard let d = m.body as? [String: Any], let id = d["id"] as? String,
+        guard let d = m.body as? [String: Any] else { return }
+        if (d["op"] as? String) == "notify" {
+            let title = d["title"] as? String ?? "", body = d["body"] as? String ?? ""
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            let c = UNUserNotificationCenter.current()
+            c.requestAuthorization(options: [.alert, .sound]) { ok, _ in
+                guard ok else { return }
+                let ct = UNMutableNotificationContent(); ct.title = title; ct.body = body; ct.sound = .default
+                c.add(UNNotificationRequest(identifier: UUID().uuidString, content: ct, trigger: nil))
+            }
+            return
+        }
+        guard let id = d["id"] as? String,
               let urlStr = d["url"] as? String, let url = URL(string: urlStr) else { return }
         var req = URLRequest(url: url, timeoutInterval: 120)
         req.httpMethod = "POST"
@@ -73,6 +87,10 @@ final class VC: UIViewController, WKScriptMessageHandler, WKUIDelegate {
                 self.web.evaluateJavaScript("window.__nativeReply(\(String(reflecting: id)), \(s))", completionHandler: nil)
             }
         }.resume()
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent n: UNNotification, withCompletionHandler h: @escaping (UNNotificationPresentationOptions) -> Void) {
+        h([.banner, .sound])
     }
 
     func webView(_ w: WKWebView, runJavaScriptAlertPanelWithMessage m: String, initiatedByFrame f: WKFrameInfo, completionHandler: @escaping () -> Void) {

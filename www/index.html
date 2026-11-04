@@ -183,6 +183,10 @@ button.rmrow{background:transparent!important; border:none!important; box-shadow
 .controls button.primary{grid-column:1/-1; padding:15px 10px; font-size:1.02rem; letter-spacing:.02em;}
 .controls button.danger{color:var(--bad);}
 footer{margin-top:8px; padding-bottom:12px;}
+#toast{position:fixed; left:14px; right:14px; top:calc(env(safe-area-inset-top,0px) + 10px); z-index:99; padding:14px 18px; border-radius:24px;
+  background:var(--glass-solid); border:1px solid var(--edge); box-shadow:var(--shadow); -webkit-backdrop-filter:blur(20px); backdrop-filter:blur(20px);
+  display:flex; flex-direction:column; gap:2px; transform:translateY(-140%); transition:transform .55s var(--spring); pointer-events:none;}
+#toast.show{transform:none;} #toast b{font-size:.95rem;} #toast span{font-size:.82rem; color:var(--muted);}
 /* 手机：每行变成一张小玻璃卡，不用横向滚动 */
 @media (max-width:640px){
   .table-scroll{overflow:visible; padding:10px;}
@@ -365,31 +369,43 @@ footer{margin-top:8px; padding-bottom:12px;}
       .catch(function(e){return {ok:false,error:e.message};});
   }
   function cfg(){return {base:(localStorage.aiBase||'').trim().replace(/\/+$/,''),key:(localStorage.aiKey||'').trim(),model:(localStorage.aiModel||'').trim()};}
+  function reqBody(c,messages){
+    var b={model:c.model,messages:messages,temperature:0,max_tokens:2000};
+    if(/deepseek/i.test(c.base)) b.thinking={type:'disabled'};   // DeepSeek 默认开思考，识图不需要，关掉快很多
+    return b;
+  }
   function aiCall(messages){
     var c=cfg();
     if(!c.base||!c.key||!c.model) return Promise.reject(new Error('请先在「AI 设置」填 Base URL / Key / 模型'));
     var url=/\/chat\/completions$/.test(c.base)?c.base:c.base+'/chat/completions';
     return httpPost(url,{'Content-Type':'application/json','Authorization':'Bearer '+c.key},
-      JSON.stringify({model:c.model,messages:messages,temperature:0})).then(function(r){
+      JSON.stringify(reqBody(c,messages))).then(function(r){
         if(!r.ok) throw new Error(r.error||'网络错误');
         var j; try{j=JSON.parse(r.text);}catch(e){throw new Error('HTTP '+r.status+' '+r.text.slice(0,120));}
         if(r.status>=300) throw new Error('HTTP '+r.status+' '+((j.error&&j.error.message)||r.text.slice(0,120)));
         return j.choices[0].message.content;
       });
   }
+  function notify(title,body){
+    var t=document.getElementById('toast');
+    if(!t){t=document.createElement('div');t.id='toast';document.body.appendChild(t);}
+    t.innerHTML='<b>'+title+'</b><span>'+body+'</span>'; t.className='show';
+    clearTimeout(window.__tt); window.__tt=setTimeout(function(){t.className='';},6000);
+    try{window.webkit.messageHandlers.native.postMessage({op:'notify',title:title,body:body});}catch(e){}
+  }
   var PROMPT='你是手写订货单/送货单(Nota de Pedido, 阿根廷, 西班牙语)识别器。读图，只输出一个 JSON，不要解释、不要代码块。格式：'+
-   '{"date":"日期","customer":"客户名或空","rows":[{"d":"品名","q":数量,"p":单价,"imp":单据上写的金额}],"total":页底TOTAL金额,"unsure":[有疑问的行序号从0起]}。'+
+   '{"date":"日期","customer":"客户名或空","rows":[{"d":"品名","q":数量,"p":单价,"imp":单据上写的金额}],"subtotal":IVA之前的小计或null,"iva":单据上写出的IVA金额或null,"hasIva":单据是否加了IVA(true/false),"total":页底TOTAL金额,"unsure":[有疑问的行序号从0起]}。'+
    '规则：1)数字用整数，千分点去掉(21.920=21920)。2)被划掉/没有金额的行不要输出。3)只照抄单据上写的数，绝不自己计算或纠正；看不清的 imp 或 p 就填 null 并把行号放进 unsure。'+
-   '4)底部若有小计、IVA 等单独的金额行，不要放进 rows，只把最终 TOTAL 填 total。5)圈起来的小数字是标记，不是数量。';
+   '4)底部的小计、IVA(21%)等单独金额行不要放进 rows：小计填 subtotal，IVA 金额填 iva(只抄写的数)，有 IVA 则 hasIva=true，最终 TOTAL 填 total。5)圈起来的小数字是标记，不是数量。';
   function shrink(dataUrl,max){
     return new Promise(function(res){var im=new Image();im.onload=function(){
       var k=Math.min(1,max/Math.max(im.width,im.height));var c=document.createElement('canvas');
       c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);
-      res(c.toDataURL('image/jpeg',0.85));};im.src=dataUrl;});
+      res(c.toDataURL('image/jpeg',0.8));};im.src=dataUrl;});
   }
   function sendToBackend(pid, file, statusEl, dataUrl){
     statusEl.className='ocr-status busy'; statusEl.textContent='AI 识别中…';
-    shrink(dataUrl,1800).then(function(img){
+    shrink(dataUrl,1500).then(function(img){
       return aiCall([{role:'user',content:[{type:'text',text:PROMPT},{type:'image_url',image_url:{url:img}}]}]);
     }).then(function(txt){
       var m=txt.match(/\{[\s\S]*\}/); if(!m) throw new Error('返回里没有 JSON：'+txt.slice(0,80));
@@ -403,12 +419,26 @@ footer{margin-top:8px; padding-bottom:12px;}
         if(uns.indexOf(i)>=0||r.p==null||r.imp==null) tb.children[start+i].style.background='rgba(255,200,0,.25)';
       });
       if(o.total!=null) document.getElementById(pid+'-printedTotal').value=o.total;
+      var calc=0; rows.forEach(function(r){calc+=(Number(r.q)||0)*(Number(r.p)||0);});
+      var tot=Number(o.total)||0, ivaW=(o.iva==null?null:Number(o.iva));
+      var hasIva=(o.hasIva===true)||(ivaW!=null&&ivaW>0)||(tot>calc&&calc>0&&Math.abs(tot-calc*1.21)<=2);
+      var ivaMsg;
+      if(hasIva){
+        var calcIva=Math.round(calc*0.21), amt=(ivaW!=null&&ivaW>0)?ivaW:((tot>calc)?(tot-calc):calcIva);
+        addRow(pid,{d:'IVA 21%',q:1,p:amt,imp:amt});
+        var ir=tb.lastElementChild; ir.style.background='rgba(10,132,255,.16)';
+        var off=Math.abs(amt-calcIva)>1;
+        if(off) ir.style.background='rgba(255,200,0,.25)';
+        ivaMsg='有 IVA，已自动加入 '+fmt.format(amt)+(off?'（与 21% 不符，请复核）':'');
+      } else { ivaMsg='单据没有 IVA'; }
+      window.__ivaMsg=ivaMsg;
       var t=wrap.querySelector('.ledger-head input.title');
       if(t&&(o.customer||o.date)) t.value=[o.customer,o.date].filter(Boolean).join(' · ');
       var g=0;document.querySelectorAll('.ledger [id$="-printedTotal"]').forEach(function(x){g+=parseFloat(x.value)||0;});
       document.getElementById('grandPrinted').value=g;
       recalcAll();
       statusEl.className='ocr-status ok'; statusEl.textContent='已识别 '+rows.length+' 行'+(uns.length?'（黄色行请复核）':'');
+      notify('识别完成：'+rows.length+' 行', window.__ivaMsg+'；'+document.getElementById('grandStatus').textContent.replace(/\s+/g,' ').trim());
     }).catch(function(err){statusEl.className='ocr-status err';statusEl.textContent='识别失败：'+err.message+(/超时|timed out/i.test(err.message)?'（该接口可能不支持图片，请换视觉模型并点「测试连接」确认）':'');});
   }
 
