@@ -175,6 +175,12 @@ footer{border:none; opacity:.7;}
 
 button.rmrow{background:transparent!important; border:none!important; box-shadow:none!important; -webkit-backdrop-filter:none; backdrop-filter:none; padding:6px 10px; color:var(--muted);}
 .ledger-head button.rmrow{color:var(--bad);}
+
+.controls{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:6px 0 20px;}
+.controls button{width:100%; padding:13px 10px; font-size:.92rem; white-space:nowrap; text-align:center;}
+.controls button.primary{grid-column:1/-1; padding:15px 10px; font-size:1.02rem; letter-spacing:.02em;}
+.controls button.danger{color:var(--bad);}
+footer{margin-top:8px; padding-bottom:12px;}
 /* 手机：每行变成一张小玻璃卡，不用横向滚动 */
 @media (max-width:640px){
   .table-scroll{overflow:visible; padding:10px;}
@@ -221,8 +227,8 @@ button.rmrow{background:transparent!important; border:none!important; box-shadow
 <div id="ledgers"></div>
 
 <div class="controls">
-  <button class="primary" id="addPageBtn">+ 新增一页</button>
-  <button id="clearDiffBtn">把"单据金额"设为当前计算值</button>
+  <button class="primary" id="addPageBtn">＋ 新增一页</button>
+  <button id="clearDiffBtn">单据金额 = 计算值</button>
 </div>
 
 <footer>数据与照片仅保存在本机。</footer>
@@ -605,7 +611,7 @@ button.rmrow{background:transparent!important; border:none!important; box-shadow
   window.__saveSnap=function(){try{localStorage.hedanData=JSON.stringify(snap());}catch(e){}};
   document.addEventListener('input',function(){clearTimeout(window.__st);window.__st=setTimeout(window.__saveSnap,500);});
   document.addEventListener('click',function(){clearTimeout(window.__st);window.__st=setTimeout(window.__saveSnap,800);});
-  var nb=document.createElement('button');nb.textContent='清空全部，开始新单';nb.style.marginLeft='8px';
+  var nb=document.createElement('button');nb.textContent='清空全部，开始新单';nb.className='danger';
   nb.onclick=function(){if(confirm('清空当前所有页面？')){localStorage.removeItem('hedanData');location.reload();}};
   document.querySelector('.controls').appendChild(nb);
   setTimeout(window.__saveSnap,1500);
