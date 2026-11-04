@@ -187,28 +187,39 @@ footer{margin-top:8px; padding-bottom:12px;}
   background:var(--glass-solid); border:1px solid var(--edge); box-shadow:var(--shadow); -webkit-backdrop-filter:blur(20px); backdrop-filter:blur(20px);
   display:flex; flex-direction:column; gap:2px; transform:translateY(-140%); transition:transform .55s var(--spring); pointer-events:none;}
 #toast.show{transform:none;} #toast b{font-size:.95rem;} #toast span{font-size:.82rem; color:var(--muted);}
-/* 手机：每行变成一张小玻璃卡，不用横向滚动 */
+/* 手机：紧凑表格，不横向滚动 */
 @media (max-width:640px){
-  .table-scroll{overflow:visible; padding:10px;}
-  table,tbody,tfoot{display:block; min-width:0; width:100%;}
-  thead{display:none;}
-  tbody tr{display:grid; grid-template-columns:repeat(3,1fr); gap:8px 10px; position:relative; padding:12px 12px 12px; margin-bottom:10px;
-    background:var(--surface-2); border:1px solid var(--rule); border-radius:20px;}
-  tbody td{display:block; padding:0; border:none; text-align:left!important;}
-  tbody td:nth-child(2){grid-column:1/-1; order:-1; padding-right:30px;}
-  tbody td:nth-child(7){position:absolute; top:6px; right:6px;}
-  tbody td::before{display:block; font-size:.66rem; color:var(--muted); margin-bottom:2px;}
-  tbody td:nth-child(1)::before{content:"数量";} tbody td:nth-child(3)::before{content:"单价";}
-  tbody td:nth-child(4)::before{content:"计算金额";} tbody td:nth-child(5)::before{content:"单据金额";} tbody td:nth-child(6)::before{content:"差额";}
-  tbody td:nth-child(2)::before{content:none;}
-  input.cell,input.cell.wide{width:100%; text-align:left;}
-  input.printed{padding-left:6px;}
-  tfoot tr{display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px 10px; padding:12px; background:var(--accent-soft); border-radius:20px;}
-  tfoot td{display:block; border:none; padding:0; text-align:left!important;}
-  tfoot td:first-child{grid-column:1/-1;}
-  tfoot td:empty,tfoot td:last-child:empty{display:none;}
-  tfoot td::before{display:block; font-size:.66rem; color:var(--muted); font-weight:500;}
-  tfoot td:nth-child(2)::before{content:"计算合计";} tfoot td:nth-child(3)::before{content:"单据合计";} tfoot td:nth-child(4)::before{content:"差额";}
+  .table-scroll{overflow:visible; padding:0 6px 4px;}
+  table{display:table; min-width:0; width:100%; table-layout:fixed; border-collapse:separate; border-spacing:0;}
+  thead{display:table-header-group;}
+  tbody{display:table-row-group;} tfoot{display:table-footer-group;}
+  tr,tbody tr,tfoot tr{display:table-row; background:transparent; border:none; border-radius:0; padding:0; margin:0;}
+  th,td,tbody td,tfoot td{display:table-cell; padding:4px 1px; border:none; border-bottom:1px solid var(--rule); text-align:right!important; vertical-align:middle; font-size:.78rem;}
+  td::before{content:none!important;}
+  thead th{font-size:.64rem; letter-spacing:0; text-transform:none; padding:8px 2px 6px; border-bottom:1px solid var(--rule-strong); white-space:nowrap;}
+  th:nth-child(1),td:nth-child(1){width:9%;}
+  th:nth-child(2),td:nth-child(2){width:29%; text-align:left!important;}
+  th:nth-child(3),td:nth-child(3){width:13%;}
+  th:nth-child(4),td:nth-child(4){width:15%;}
+  th:nth-child(5),td:nth-child(5){width:15%;}
+  th:nth-child(6),td:nth-child(6){width:12%;}
+  th:nth-child(7),td:nth-child(7){width:7%;}
+  tbody td:nth-child(2){grid-column:auto; order:0; padding-right:2px;}
+  tbody td:nth-child(7){position:static;}
+  input.cell,input.cell.wide{width:100%; min-width:0; text-align:right; padding:5px 2px; font-size:.7rem; border-radius:7px; letter-spacing:-.02em;}
+  input.desc{min-width:0; width:100%; padding:5px 4px; font-size:.7rem; letter-spacing:-.02em; border-radius:8px; text-overflow:ellipsis;}
+  input.printed{padding:5px 2px; font-size:.7rem;}
+  .computed{font-size:.7rem; letter-spacing:-.03em;}
+  .badge{padding:2px 6px; font-size:.7rem;}
+  .badge .bt{display:none;}
+  button.rmrow{padding:2px 0; font-size:.9rem;}
+  tbody tr[style*="background"] td{background:inherit;}
+  tfoot td{font-size:.8rem; padding:9px 2px; border-top:1px solid var(--rule-strong); border-bottom:none; background:var(--accent-soft);}
+  tfoot td:first-child{border-radius:14px 0 0 14px; padding-left:10px; text-align:left!important;}
+  tfoot td:last-child{border-radius:0 14px 14px 0;}
+  tfoot td:empty{display:table-cell;}
+  tfoot td[colspan]{width:auto;}
+  .ledger-head{padding:12px 14px;} .photo-zone{padding:12px 14px;}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important;}}
 </style>
@@ -529,11 +540,11 @@ footer{margin-top:8px; padding-bottom:12px;}
         pageCalc += calc;
         calcCell.textContent = fmt.format(calc);
         if(imp === null){
-          diffCell.innerHTML = '<span class="badge">待填</span>';
+          diffCell.innerHTML = '<span class="badge">–</span>';
         } else {
           var diff = calc - imp;
           if(diff === 0){
-            diffCell.innerHTML = '<span class="badge ok">✓ 一致</span>';
+            diffCell.innerHTML = '<span class="badge ok">✓<span class="bt"> 一致</span></span>';
           } else {
             diffCell.innerHTML = '<span class="badge bad">' + (diff > 0 ? '+' : '') + fmt.format(diff) + '</span>';
             allOk = false;
@@ -550,7 +561,7 @@ footer{margin-top:8px; padding-bottom:12px;}
         var printedTotal = parseFloat(printedTotalInput.value) || 0;
         var totalDiff = pageCalc - printedTotal;
         if(totalDiff === 0){
-          totalDiffCell.innerHTML = '<span class="badge ok">✓ 相符</span>';
+          totalDiffCell.innerHTML = '<span class="badge ok">✓<span class="bt"> 相符</span></span>';
         } else {
           totalDiffCell.innerHTML = '<span class="badge bad">' + (totalDiff > 0 ? '+' : '') + fmt.format(totalDiff) + '</span>';
           allOk = false;
