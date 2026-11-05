@@ -102,6 +102,14 @@ final class VC: UIViewController, WKScriptMessageHandler, WKUIDelegate, UNUserNo
         h([.banner, .list, .sound])
     }
 
+    func reply(_ id: String, _ obj: [String: Any]) {
+        guard let j = try? JSONSerialization.data(withJSONObject: obj),
+              let str = String(data: j, encoding: .utf8) else { return }
+        DispatchQueue.main.async {
+            self.web.evaluateJavaScript("window.__nativeReply(\(String(reflecting: id)), \(str))", completionHandler: nil)
+        }
+    }
+
     // ---- 原生相机：网页里的 app:// 不是安全环境，<input capture> 打不开相机 ----
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
         picker.dismiss(animated: true)
