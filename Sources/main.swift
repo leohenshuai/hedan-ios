@@ -25,8 +25,13 @@ final class SchemeHandler: NSObject, WKURLSchemeHandler {
     func webView(_ webView: WKWebView, stop task: WKURLSchemeTask) {}
 }
 
-final class VC: UIViewController, WKScriptMessageHandler, WKUIDelegate, UNUserNotificationCenterDelegate, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+final class VC: UIViewController, WKScriptMessageHandler, WKUIDelegate, UNUserNotificationCenterDelegate, UIImagePickerControllerDelegate, UINavigationControllerDelegate, WKNavigationDelegate {
     var camId: String?
+    var pendingURL: URL {
+        let d = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
+        return d.appendingPathComponent("pending.jpg")
+    }
     var web: WKWebView!
 
     override func viewDidLoad() {
@@ -44,6 +49,7 @@ final class VC: UIViewController, WKScriptMessageHandler, WKUIDelegate, UNUserNo
         web.scrollView.backgroundColor = .clear
         web.scrollView.contentInsetAdjustmentBehavior = .never
         web.uiDelegate = self
+        web.navigationDelegate = self
         web.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(web)
         let g = view.safeAreaLayoutGuide
@@ -67,6 +73,16 @@ final class VC: UIViewController, WKScriptMessageHandler, WKUIDelegate, UNUserNo
                 let ct = UNMutableNotificationContent(); ct.title = title; ct.body = body; ct.sound = .default
                 c.add(UNNotificationRequest(identifier: UUID().uuidString, content: ct, trigger: nil))
             }
+            return
+        }
+        if (d["op"] as? String) == "takePending" {
+            guard let id = d["id"] as? String else { return }
+            if let data = try? Data(contentsOf: pendingURL) { reply(id, ["ok": true, "data": "data:image/jpeg;base64," + data.base64EncodedString()]) }
+            else { reply(id, ["ok": false, "error": "none"]) }
+            return
+        }
+        if (d["op"] as? String) == "clearPending" {
+            try? FileManager.default.removeItem(at: pendingURL)
             return
         }
         if (d["op"] as? String) == "camera" {
@@ -98,6 +114,11 @@ final class VC: UIViewController, WKScriptMessageHandler, WKUIDelegate, UNUserNo
         }.resume()
     }
 
+    // 相机占用前台时 iOS 可能回收网页进程，不处理就是整屏黑
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        webView.load(URLRequest(url: URL(string: "app://localhost/index.html")!))
+    }
+
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent n: UNNotification, withCompletionHandler h: @escaping (UNNotificationPresentationOptions) -> Void) {
         h([.banner, .list, .sound])
     }
@@ -123,6 +144,7 @@ final class VC: UIViewController, WKScriptMessageHandler, WKUIDelegate, UNUserNo
         img.draw(in: CGRect(origin: .zero, size: sz))
         let small = UIGraphicsGetImageFromCurrentImageContext(); UIGraphicsEndImageContext()
         guard let data = (small ?? img).jpegData(compressionQuality: 0.85) else { reply(id, ["ok": false, "error": "编码失败"]); return }
+        try? data.write(to: pendingURL)
         reply(id, ["ok": true, "data": "data:image/jpeg;base64," + data.base64EncodedString()])
     }
 

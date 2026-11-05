@@ -374,6 +374,7 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
       snapPhoto().then(function(res){
         if(!res.ok) throw new Error(res.error==='cancel'?'已取消':(res.error||'打不开相机'));
         addPhoto(pid, res.data);
+        nativeCall({op:'clearPending'});
       }).catch(function(e){
         if(e.message!=='已取消') alert('拍照失败：'+e.message+'\n可以改用「相册/文件」。');
       });
@@ -432,6 +433,7 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
       document.getElementById('lightbox').classList.add('show');
     });
     card.querySelector('.rm').addEventListener('click',function(){ card.remove(); });
+    shrink(dataUrl,360).then(function(t){ card.__thumb=t; });
     var st=card.querySelector('.ocr-status');
     card.querySelector('.retry').addEventListener('click',function(){
       card.querySelector('.retry').classList.remove('show');
@@ -766,17 +768,27 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
     var out=[];document.querySelectorAll('.ledger').forEach(function(w){
       var pid=w.id,rows=[];
       w.querySelectorAll('tbody tr').forEach(function(tr){rows.push({d:tr.querySelector('input.desc').value,q:tr.querySelector('input[id$="-q"]').value,p:tr.querySelector('input[id$="-p"]').value,imp:tr.querySelector('input[id$="-imp"]').value});});
-      var im=w.querySelector('.photo-card img');
-      out.push({title:w.querySelector('input.title').value,printed:parseFloat(document.getElementById(pid+'-printedTotal').value)||0,rows:rows,photo:im?im.src:''});
+      var pc=w.querySelector('.photo-card'), im=pc&&pc.querySelector('img');
+      var ph=pc?(pc.__thumb||(im&&im.src.length<200000?im.src:'')):'';
+      out.push({title:w.querySelector('input.title').value,printed:parseFloat(document.getElementById(pid+'-printedTotal').value)||0,rows:rows,photo:ph});
     });return out;
   }
-  window.__saveSnap=function(){try{localStorage.hedanData=JSON.stringify(snap());}catch(e){}};
+  window.__saveSnap=function(){try{localStorage.hedanData=JSON.stringify(snap());}catch(e){console.log('save fail',e&&e.message);}};
   document.addEventListener('input',function(){clearTimeout(window.__st);window.__st=setTimeout(window.__saveSnap,500);});
   document.addEventListener('click',function(){clearTimeout(window.__st);window.__st=setTimeout(window.__saveSnap,800);});
   var nb=document.createElement('button');nb.textContent='清空全部，开始新单';nb.className='danger';
   nb.onclick=function(){if(confirm('清空当前所有页面？')){localStorage.removeItem('hedanData');location.reload();}};
   document.querySelector('.controls').appendChild(nb);
   setTimeout(window.__saveSnap,1500);
+  // 如果上次拍完照页面被系统回收，照片还留在原生侧：取回来继续识别
+  setTimeout(function(){
+    nativeCall({op:'takePending'}).then(function(res){
+      if(!res.ok||!res.data) return;
+      var wraps=document.querySelectorAll('.ledger'); if(!wraps.length) return;
+      addPhoto(wraps[wraps.length-1].id, res.data);
+      nativeCall({op:'clearPending'});
+    });
+  },700);
 })();
 </script>
 
