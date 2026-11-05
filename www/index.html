@@ -262,6 +262,15 @@ tbody tr.iva input{color:var(--accent)!important; font-weight:700;}
 tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
 #toast.iva{border-color:var(--accent); box-shadow:0 10px 30px rgba(10,132,255,.35);}
 #toast.iva b{color:var(--accent);}
+
+.photo-drop{cursor:default!important;}
+.photo-btns{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;}
+.pbtn{flex:1 1 auto; padding:10px 12px; font-size:.82rem; border-radius:14px; min-width:104px;}
+.pbtn.cam{background:linear-gradient(180deg,#3b9cff,#0a6fe0); color:#fff; border-color:rgba(255,255,255,.45);}
+.photo-card{width:132px;}
+.photo-card img{width:132px; height:132px;}
+.photo-card .retry{display:none; width:100%; margin-top:4px; padding:6px 4px; font-size:.7rem; border-radius:10px; color:var(--accent);}
+.photo-card .retry.show{display:block;}
 @media (prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important;}}
 </style>
 
@@ -321,7 +330,12 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
         '<button class="rmrow" data-act="rmpage" style="font-size:1.1rem;">✕ 删除本页</button>' +
       '</div>' +
       '<div class="photo-zone">' +
-        '<label class="photo-drop">上传/拍照单据（留作对照）<br>点击选择图片<input type="file" accept="image/*" multiple style="display:none" data-act="filein"></label>' +
+        '<div class="photo-drop" style="cursor:default">上传/拍照单据（留作对照）' +
+        '<div class="photo-btns">' +
+          '<button type="button" class="pbtn cam" data-act="snap">📷 拍照</button>' +
+          '<button type="button" class="pbtn" data-act="pick">🖼 相册/文件</button>' +
+        '</div>' +
+        '<input type="file" accept="image/*" multiple style="display:none" data-act="filein"></div>' +
         '<div class="photo-list" style="display:flex; gap:10px; flex-wrap:wrap;"></div>' +
       '</div>' +
       '<div class="import-zone">' +
@@ -352,6 +366,18 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
       handleFiles(pid, e.target.files);
       e.target.value = '';
     });
+    wrap.querySelector('[data-act="pick"]').addEventListener('click', function(){
+      wrap.querySelector('[data-act="filein"]').click();
+    });
+    wrap.querySelector('[data-act="snap"]').addEventListener('click', function(){
+      var status = document.createElement('span'); status.className='ocr-status busy'; status.textContent='打开相机…';
+      snapPhoto().then(function(res){
+        if(!res.ok) throw new Error(res.error==='cancel'?'已取消':(res.error||'打不开相机'));
+        addPhoto(pid, res.data);
+      }).catch(function(e){
+        if(e.message!=='已取消') alert('拍照失败：'+e.message+'\n可以改用「相册/文件」。');
+      });
+    });
     wrap.querySelector('[data-act="import"]').addEventListener('click', function(){
       importText(pid, wrap.querySelector('.import-zone textarea'), wrap.querySelector('.import-msg'));
     });
@@ -380,6 +406,40 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
     recalcAll();
   }
 
+  function nativeCall(msg){
+    return new Promise(function(res){
+      if(!(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.native)){
+        return res({ok:false,error:'这个功能只能在 App 里用'});
+      }
+      var id='c'+Date.now()+Math.random().toString(36).slice(2);
+      __cbs[id]=res; msg.id=id;
+      try{window.webkit.messageHandlers.native.postMessage(msg);}catch(e){res({ok:false,error:e.message});}
+    });
+  }
+  function snapPhoto(){ return nativeCall({op:'camera'}); }
+
+  // 把一张图(dataURL)加进这一页：缩略图 + 状态 + 重试按钮，并开始识别
+  function addPhoto(pid, dataUrl){
+    var list=document.querySelector('#'+pid+' .photo-list');
+    var card=document.createElement('div');
+    card.className='photo-card';
+    card.innerHTML='<img src="'+dataUrl+'"><button class="rm" title="移除">✕</button>'+
+      '<div class="ocr-status"></div><button class="retry" title="重新识别">↻ 重试识别</button>';
+    card.__src=dataUrl; card.__key='ph'+Date.now()+Math.random().toString(36).slice(2);
+    list.appendChild(card);
+    card.querySelector('img').addEventListener('click',function(){
+      document.getElementById('lightboxImg').src=dataUrl;
+      document.getElementById('lightbox').classList.add('show');
+    });
+    card.querySelector('.rm').addEventListener('click',function(){ card.remove(); });
+    var st=card.querySelector('.ocr-status');
+    card.querySelector('.retry').addEventListener('click',function(){
+      card.querySelector('.retry').classList.remove('show');
+      sendToBackend(pid, null, st, dataUrl, card.__key);
+    });
+    sendToBackend(pid, dataUrl, st, dataUrl, card.__key);
+  }
+
   function handleFiles(pid, files){
     var list = document.querySelector('#' + pid + ' .photo-list');
     if(!list.__seen) list.__seen = {};
@@ -390,20 +450,7 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
       if(list.__seen[fp]) return;
       list.__seen[fp] = true;
       var reader = new FileReader();
-      reader.onload = function(e){
-        var card = document.createElement('div');
-        card.className = 'photo-card';
-        card.innerHTML =
-          '<img src="' + e.target.result + '"><button class="rm" title="移除">✕</button>' +
-          '<div class="ocr-status"></div>';
-        list.appendChild(card);
-        card.querySelector('img').addEventListener('click', function(){
-          document.getElementById('lightboxImg').src = e.target.result;
-          document.getElementById('lightbox').classList.add('show');
-        });
-        card.querySelector('.rm').addEventListener('click', function(){ card.remove(); });
-        sendToBackend(pid, file, card.querySelector('.ocr-status'), e.target.result);
-      };
+      reader.onload = function(e){ addPhoto(pid, e.target.result); };
       reader.readAsDataURL(file);
     });
   }
@@ -474,7 +521,7 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
       c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);
       res(c.toDataURL('image/jpeg',0.8));};im.src=dataUrl;});
   }
-  function sendToBackend(pid, file, statusEl, dataUrl){
+  function sendToBackend(pid, file, statusEl, dataUrl, srcKey){
     statusEl.className='ocr-status busy'; statusEl.textContent='AI 识别中…';
     shrink(dataUrl,1500).then(function(img){
       return aiCall([{role:'user',content:[{type:'text',text:PROMPT},{type:'image_url',image_url:{url:img}}]}]);
@@ -484,10 +531,12 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
       var wrap=document.getElementById(pid);
       var tb=wrap.querySelector('tbody');
       Array.prototype.slice.call(tb.children).forEach(function(tr){var q=tr.querySelector('input[id$="-q"]').value,p=tr.querySelector('input[id$="-p"]').value,d=tr.querySelector('input.desc').value; if(!q&&!p&&!d) tr.remove();});
+      if(srcKey){ Array.prototype.slice.call(tb.querySelectorAll('tr[data-src="'+srcKey+'"]')).forEach(function(tr){tr.remove();}); }
       var start=tb.children.length;
       rows.forEach(function(r,i){
         addRow(pid,{d:r.d||'',q:r.q,p:r.p,imp:r.imp});
         if(uns.indexOf(i)>=0||r.p==null||r.imp==null) tb.children[start+i].classList.add('warn');
+        if(srcKey) tb.children[start+i].dataset.src=srcKey;
       });
       if(o.total!=null) document.getElementById(pid+'-printedTotal').value=o.total;
       var calc=0; rows.forEach(function(r){calc+=(Number(r.q)||0)*(Number(r.p)||0);});
@@ -497,7 +546,7 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
       if(hasIva){
         var calcIva=Math.round(calc*0.21), amt=(ivaW!=null&&ivaW>0)?ivaW:((tot>calc)?(tot-calc):calcIva);
         addRow(pid,{d:'IVA 21%',q:1,p:amt,imp:amt});
-        var ir=tb.lastElementChild; ir.classList.add('iva');
+        var ir=tb.lastElementChild; ir.classList.add('iva'); if(srcKey) ir.dataset.src=srcKey;
         var off=Math.abs(amt-calcIva)>1;
         
         ivaMsg='有 IVA，已自动加入 '+fmt.format(amt)+(off?'（与 21% 不符，请复核）':'');
@@ -510,7 +559,9 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
       recalcAll();
       statusEl.className='ocr-status ok'; statusEl.textContent='已识别 '+rows.length+' 行'+(uns.length?'（黄色行请复核）':'');
       notify('识别完成：'+rows.length+' 行', window.__ivaMsg+'；'+document.getElementById('grandStatus').textContent.replace(/\s+/g,' ').trim());
-    }).catch(function(err){statusEl.className='ocr-status err';statusEl.textContent='识别失败：'+err.message+(/超时|timed out/i.test(err.message)?'（该接口可能不支持图片，请换视觉模型并点「测试连接」确认）':'');});
+    }).catch(function(err){
+      statusEl.className='ocr-status err';statusEl.textContent='识别失败：'+err.message+(/超时|timed out/i.test(err.message)?'（该接口可能不支持图片，请换视觉模型并点「测试连接」确认）':'');
+      var rc=statusEl.parentNode&&statusEl.parentNode.querySelector('.retry'); if(rc) rc.classList.add('show');});
   }
 
   // 不假设"品名"和"数量"谁在前谁在后——按每个逗号分隔的片段自动分类：

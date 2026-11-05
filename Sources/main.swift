@@ -25,7 +25,8 @@ final class SchemeHandler: NSObject, WKURLSchemeHandler {
     func webView(_ webView: WKWebView, stop task: WKURLSchemeTask) {}
 }
 
-final class VC: UIViewController, WKScriptMessageHandler, WKUIDelegate, UNUserNotificationCenterDelegate {
+final class VC: UIViewController, WKScriptMessageHandler, WKUIDelegate, UNUserNotificationCenterDelegate, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+    var camId: String?
     var web: WKWebView!
 
     override func viewDidLoad() {
@@ -68,6 +69,14 @@ final class VC: UIViewController, WKScriptMessageHandler, WKUIDelegate, UNUserNo
             }
             return
         }
+        if (d["op"] as? String) == "camera" {
+            guard let id = d["id"] as? String else { return }
+            guard UIImagePickerController.isSourceTypeAvailable(.camera) else { reply(id, ["ok": false, "error": "设备没有可用相机"]); return }
+            camId = id
+            let pk = UIImagePickerController(); pk.sourceType = .camera; pk.delegate = self
+            present(pk, animated: true)
+            return
+        }
         guard let id = d["id"] as? String,
               let urlStr = d["url"] as? String, let url = URL(string: urlStr) else { return }
         var req = URLRequest(url: url, timeoutInterval: 120)
@@ -91,6 +100,28 @@ final class VC: UIViewController, WKScriptMessageHandler, WKUIDelegate, UNUserNo
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent n: UNNotification, withCompletionHandler h: @escaping (UNNotificationPresentationOptions) -> Void) {
         h([.banner, .list, .sound])
+    }
+
+    // ---- 原生相机：网页里的 app:// 不是安全环境，<input capture> 打不开相机 ----
+    func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+        picker.dismiss(animated: true)
+        guard let id = camId else { return }
+        camId = nil
+        guard let img = info[.originalImage] as? UIImage else { reply(id, ["ok": false, "error": "没有取到照片"]); return }
+        let maxSide: CGFloat = 1800
+        let k = min(1, maxSide / max(img.size.width, img.size.height))
+        let sz = CGSize(width: img.size.width * k, height: img.size.height * k)
+        UIGraphicsBeginImageContextWithOptions(sz, true, 1)
+        img.draw(in: CGRect(origin: .zero, size: sz))
+        let small = UIGraphicsGetImageFromCurrentImageContext(); UIGraphicsEndImageContext()
+        guard let data = (small ?? img).jpegData(compressionQuality: 0.85) else { reply(id, ["ok": false, "error": "编码失败"]); return }
+        reply(id, ["ok": true, "data": "data:image/jpeg;base64," + data.base64EncodedString()])
+    }
+
+    func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+        picker.dismiss(animated: true)
+        if let id = camId { reply(id, ["ok": false, "error": "cancel"]) }
+        camId = nil
     }
 
     func webView(_ w: WKWebView, runJavaScriptAlertPanelWithMessage m: String, initiatedByFrame f: WKFrameInfo, completionHandler: @escaping () -> Void) {
