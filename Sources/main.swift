@@ -160,13 +160,23 @@ final class VC: UIViewController, WKScriptMessageHandler, WKUIDelegate, UNUserNo
         guard let id = camId else { return }
         camId = nil
         guard let img = info[.originalImage] as? UIImage else { reply(id, ["ok": false, "error": "没有取到照片"]); return }
+        // 用 UIGraphicsImageRenderer 重绘：自动处理方向和颜色空间（旧的 UIGraphicsBeginImageContext 在相机图上会画成近乎空白）
         let maxSide: CGFloat = 1800
         let k = min(1, maxSide / max(img.size.width, img.size.height))
-        let sz = CGSize(width: img.size.width * k, height: img.size.height * k)
-        UIGraphicsBeginImageContextWithOptions(sz, true, 1)
-        img.draw(in: CGRect(origin: .zero, size: sz))
-        let small = UIGraphicsGetImageFromCurrentImageContext(); UIGraphicsEndImageContext()
-        guard let data = (small ?? img).jpegData(compressionQuality: 0.85) else { reply(id, ["ok": false, "error": "编码失败"]); return }
+        let sz = CGSize(width: (img.size.width * k).rounded(), height: (img.size.height * k).rounded())
+        let fmt = UIGraphicsImageRendererFormat.default()
+        fmt.scale = 1; fmt.opaque = true
+        let small = UIGraphicsImageRenderer(size: sz, format: fmt).image { ctx in
+            UIColor.white.setFill(); ctx.fill(CGRect(origin: .zero, size: sz))
+            img.draw(in: CGRect(origin: .zero, size: sz))
+        }
+        guard let data = small.jpegData(compressionQuality: 0.85), data.count > 20_000 else {
+            // 编码后异常地小，说明重绘失败：退回直接压原图
+            guard let raw = img.jpegData(compressionQuality: 0.7) else { reply(id, ["ok": false, "error": "编码失败"]); return }
+            try? raw.write(to: pendingURL)
+            reply(id, ["ok": true, "data": "data:image/jpeg;base64," + raw.base64EncodedString()])
+            return
+        }
         try? data.write(to: pendingURL)
         reply(id, ["ok": true, "data": "data:image/jpeg;base64," + data.base64EncodedString()])
     }
