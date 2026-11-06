@@ -1,6 +1,7 @@
 import UIKit
 import WebKit
 import UserNotifications
+import AudioToolbox
 
 final class SchemeHandler: NSObject, WKURLSchemeHandler {
     let root: URL
@@ -64,6 +65,28 @@ final class VC: UIViewController, WKScriptMessageHandler, WKUIDelegate, UNUserNo
     // JS -> 原生 HTTP（绕开 CORS）：{id, url, headers, body}
     func userContentController(_ c: WKUserContentController, didReceive m: WKScriptMessage) {
         guard let d = m.body as? [String: Any] else { return }
+        if (d["op"] as? String) == "fx" {
+            let kind = d["kind"] as? String ?? "tap"
+            let sound = (d["sound"] as? Bool) ?? true, haptic = (d["haptic"] as? Bool) ?? true
+            if haptic {
+                switch kind {
+                case "success": UINotificationFeedbackGenerator().notificationOccurred(.success)
+                case "warning": UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                case "error":   UINotificationFeedbackGenerator().notificationOccurred(.error)
+                case "select":  UISelectionFeedbackGenerator().selectionChanged()
+                case "heavy":   UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                case "soft":    UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+                default:        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                }
+            }
+            if sound {
+                // 系统音：跟随静音开关，不需要额外音频文件
+                let ids: [String: UInt32] = ["tap": 1104, "select": 1104, "soft": 1104, "heavy": 1105,
+                                              "success": 1407, "warning": 1053, "error": 1073]
+                if let sid = ids[kind] { AudioServicesPlaySystemSound(sid) }
+            }
+            return
+        }
         if (d["op"] as? String) == "notify" {
             let title = d["title"] as? String ?? "", body = d["body"] as? String ?? ""
             UINotificationFeedbackGenerator().notificationOccurred(.success)

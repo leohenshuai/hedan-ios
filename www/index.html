@@ -271,6 +271,10 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
 .photo-card img{width:132px; height:132px;}
 .photo-card .retry{display:none; width:100%; margin-top:4px; padding:6px 4px; font-size:.7rem; border-radius:10px; color:var(--accent);}
 .photo-card .retry.show{display:block;}
+
+.fxrow{display:flex; gap:18px; flex-wrap:wrap; margin-top:2px; font-size:.84rem;}
+.fxrow label{display:flex; align-items:center; gap:6px; cursor:pointer;}
+.fxrow input{width:18px; height:18px; accent-color:var(--accent);}
 @media (prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important;}}
 </style>
 
@@ -289,6 +293,7 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
 <input type="password" id="aiKey" placeholder="API Key" style="width:100%">
 <input type="text" id="aiModel" placeholder="必须是视觉模型，如 gpt-4o / gemini-2.5-flash / qwen-vl（deepseek 不支持图片）" style="width:100%">
 <div><button id="aiTest">测试连接</button> <span id="aiMsg"></span></div>
+<div class="fxrow"><label><input type="checkbox" id="fxHaptic" checked> 振动反馈</label><label><input type="checkbox" id="fxSound" checked> 音效反馈</label></div>
 <div class="hint">Key 只存在本机；照片只在识别时发给你填的接口。</div></div></details></div>
 
 <div id="ledgers"></div>
@@ -370,6 +375,7 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
       wrap.querySelector('[data-act="filein"]').click();
     });
     wrap.querySelector('[data-act="snap"]').addEventListener('click', function(){
+      fx('soft');
       var status = document.createElement('span'); status.className='ocr-status busy'; status.textContent='打开相机…';
       snapPhoto().then(function(res){
         if(!res.ok) throw new Error(res.error==='cancel'?'已取消':(res.error||'打不开相机'));
@@ -560,10 +566,13 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
       document.getElementById('grandPrinted').value=g;
       recalcAll();
       statusEl.className='ocr-status ok'; statusEl.textContent='已识别 '+rows.length+' 行'+(uns.length?'（黄色行请复核）':'');
-      notify('识别完成：'+rows.length+' 行', window.__ivaMsg+'；'+document.getElementById('grandStatus').textContent.replace(/\s+/g,' ').trim());
+      var gs=document.getElementById('grandStatus');
+      fx(gs.classList.contains('ok')?'success':'warning');
+      notify('识别完成：'+rows.length+' 行', window.__ivaMsg+'；'+gs.textContent.replace(/\s+/g,' ').trim());
     }).catch(function(err){
       statusEl.className='ocr-status err';statusEl.textContent='识别失败：'+err.message+(/超时|timed out/i.test(err.message)?'（该接口可能不支持图片，请换视觉模型并点「测试连接」确认）':'');
-      var rc=statusEl.parentNode&&statusEl.parentNode.querySelector('.retry'); if(rc) rc.classList.add('show');});
+      var rc=statusEl.parentNode&&statusEl.parentNode.querySelector('.retry'); if(rc) rc.classList.add('show');
+      fx('error');});
   }
 
   // 不假设"品名"和"数量"谁在前谁在后——按每个逗号分隔的片段自动分类：
@@ -686,6 +695,7 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
     });
 
     document.getElementById('grandCalc').textContent = fmt.format(grandCalc);
+    var __prevOk=window.__lastOk;
     var grandDiff = grandCalc - grandPrinted;
     var statusEl = document.getElementById('grandStatus');
     if(!anyRow){
@@ -694,7 +704,10 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
     } else if(grandDiff === 0 && allOk){
       statusEl.className = 'status-pill ok';
       statusEl.innerHTML = '<span class="dot"></span>全部核对通过';
+      if(__prevOk===false) fx('success');
+      window.__lastOk=true;
     } else {
+      window.__lastOk=false;
       statusEl.className = 'status-pill err';
       statusEl.innerHTML = '<span class="dot"></span>差 ' + (grandDiff > 0 ? '+' : '') + fmt.format(grandDiff);
     }
@@ -752,6 +765,31 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
     addRow(firstPid, {d:'', q:'', p:'', imp:''});
   }
 
+
+  // ===== 振动 + 音效反馈 =====
+  var fxLast=0;
+  function fx(kind){
+    var h=localStorage.fxHaptic!=='0', so=localStorage.fxSound!=='0';
+    if(!h&&!so) return;
+    var now=Date.now(); if(now-fxLast<45) return; fxLast=now;   // 防止连点时堵塞
+    try{window.webkit.messageHandlers.native.postMessage({op:'fx',kind:kind,haptic:h,sound:so});}catch(e){}
+  }
+  window.fx=fx;
+  ['fxHaptic','fxSound'].forEach(function(id){
+    var el=document.getElementById(id), k=id==='fxHaptic'?'fxHaptic':'fxSound';
+    el.checked=localStorage[k]!=='0';
+    el.addEventListener('change',function(){localStorage[k]=el.checked?'1':'0'; if(el.checked) fx('select');});
+  });
+  // 按钮：主按钮 soft，普通 tap，删除类 warning
+  document.addEventListener('click',function(e){
+    var b=e.target.closest&&e.target.closest('button,summary,.photo-card img');
+    if(!b) return;
+    if(b.classList.contains('rm')||b.classList.contains('rmrow')||b.id==='nb'||/清空/.test(b.textContent||'')) fx('warning');
+    else if(b.classList.contains('primary')||b.classList.contains('cam')) fx('soft');
+    else fx('tap');
+  },true);
+  // 输入框获得焦点：轻微选择反馈
+  document.addEventListener('focusin',function(e){ if(e.target&&/^(INPUT|TEXTAREA)$/.test(e.target.tagName)&&e.target.type!=='checkbox') fx('select'); });
   ['aiBase','aiKey','aiModel'].forEach(function(k){var el=document.getElementById(k);el.value=localStorage[k]||'';el.addEventListener('input',function(){localStorage[k]=el.value;});});
   if(!cfg().base) document.getElementById('cfg').open=true;
   document.getElementById('aiTest').addEventListener('click',function(){
