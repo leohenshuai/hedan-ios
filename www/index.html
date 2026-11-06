@@ -767,7 +767,13 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
       var pt = document.getElementById(pid + '-printedTotal');
       if(pt) pt.value = pageCalc;
     });
-    var gc = document.getElementById('grandCalc').textContent.replace(/,/g,'');
+    // 不要从显示文字反解（es-AR 的千分位是「.」，会把 954.600 读成 954.6），直接按各页数字累加
+    var gc = 0;
+    document.querySelectorAll('.ledger').forEach(function(w){
+      w.querySelectorAll('tbody tr').forEach(function(tr){
+        gc += (parseFloat(tr.querySelector('input[id$="-q"]').value)||0) * (parseFloat(tr.querySelector('input[id$="-p"]').value)||0);
+      });
+    });
     document.getElementById('grandPrinted').value = gc;
     recalcAll();
   });
