@@ -504,6 +504,14 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
     var n=parseFloat(t); return isNaN(n)?null:n;
   }
   // 模型偶发用别的字段名(price/amount/qty/name)，统一成 d/q/p/imp
+  // 判断一行是不是「没订」：没有数量、或金额栏是 STOCK / NO HAY 之类
+  var NOHAY=/^\s*(stock|no\s*hay|nohay|sin\s*stock|agotado|falta|no|n\/h|缺货|没有|无)\s*$/i;
+  function isSkippedRow(raw,n){
+    var impRaw=raw.imp!==undefined?raw.imp:(raw.amount!==undefined?raw.amount:raw.importe);
+    if(typeof impRaw==='string'&&NOHAY.test(impRaw)) return true;
+    if(!n.q||n.q<=0) return true;           // 没有数量 = 没订
+    return false;
+  }
   function normRow(r){
     var pick=function(){for(var i=0;i<arguments.length;i++){var k=arguments[i]; if(r[k]!==undefined&&r[k]!==null&&r[k]!=='') return r[k];} return null;};
     var q=num(pick('q','qty','quantity','cantidad'));
@@ -562,7 +570,9 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
    '规则：1)数字用整数，千分点去掉(21.920=21920)。2)被划掉/没有金额的行不要输出。3)只照抄单据上写的数，绝不自己计算或纠正；看不清的 imp 或 p 就填 null 并把行号放进 unsure。'+
    '4)底部的小计、IVA(21%)等单独金额行不要放进 rows：小计填 subtotal，IVA 金额填 iva(只抄写的数)，有 IVA 则 hasIva=true，最终 TOTAL 填 total。5)圈起来的小数字是标记，不是数量。'+
    '6)版式：最左窄列是数量(手写，常写在品名左边)，中间列是单价，最右列是金额。先按列定位再读数，不要把单价和金额搞反。'+
-   '7)每行必须尽量填满 q/p/imp 三个数：只看得清金额就把 p 填成 imp÷q 的整数结果；只看得清单价就把 imp 填成 q×p；都不确定才填 null。'+
+   '7)数量(q)必须是单据上手写出来的数字，绝不能自己补 1 或估计。数量栏空白、写横线「-」「—」、或看不清时，q 填 null。'+
+   '只有单价、没有数量的行，或金额栏写 STOCK / NO HAY / NO / 没有 / 缺货 的行，是「没订这件」，不要输出到 rows。'+
+   '数量和单价都有而金额看不清时，imp 才可以填 q×p；有数量和金额但单价看不清，p 填 imp÷q。'+
    '8)完全空白、没写字迹的行不要输出。9)品名按单据原文，不要翻成中文。';
   function sendToBackend(pid, file, statusEl, dataUrl, srcKey){
     statusEl.className='ocr-status busy'; statusEl.textContent='AI 识别中…';
@@ -570,7 +580,11 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
       return aiCall([{role:'user',content:[{type:'text',text:PROMPT},{type:'image_url',image_url:{url:img}}]}]);
     }).then(function(txt){
       var m=txt.match(/\{[\s\S]*\}/); if(!m) throw new Error('返回里没有 JSON：'+txt.slice(0,80));
-      var o=JSON.parse(m[0]); var rows=(o.rows||[]).map(normRow); var uns=o.unsure||[];
+      var o=JSON.parse(m[0]);
+      var skipped=0;
+      var rows=(o.rows||[]).map(function(r){var n=normRow(r); n.__skip=isSkippedRow(r,n); return n;}).filter(function(n){ if(n.__skip) skipped++; return !n.__skip; });
+      var uns=[];   // unsure 序号是按原始行给的，过滤后会错位，这里改为只靠本地检查标黄
+      window.__skipped=skipped;
       var wrap=document.getElementById(pid);
       var tb=wrap.querySelector('tbody');
       Array.prototype.slice.call(tb.children).forEach(function(tr){var q=tr.querySelector('input[id$="-q"]').value,p=tr.querySelector('input[id$="-p"]').value,d=tr.querySelector('input.desc').value; if(!q&&!p&&!d) tr.remove();});
@@ -578,7 +592,7 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
       var start=tb.children.length;
       rows.forEach(function(r,i){
         addRow(pid,{d:r.d||'',q:r.q,p:r.p,imp:r.imp});
-        if(uns.indexOf(i)>=0||r.p==null||r.imp==null) tb.children[start+i].classList.add('warn');
+        if(r.p==null||r.imp==null||(r.q&&r.p&&r.imp&&r.q*r.p!==r.imp)) tb.children[start+i].classList.add('warn');
         if(srcKey) tb.children[start+i].dataset.src=srcKey;
       });
       if(o.total!=null) document.getElementById(pid+'-printedTotal').value=o.total;
@@ -600,7 +614,7 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
       var g=0;document.querySelectorAll('.ledger [id$="-printedTotal"]').forEach(function(x){g+=parseFloat(x.value)||0;});
       document.getElementById('grandPrinted').value=g;
       recalcAll();
-      statusEl.className='ocr-status ok'; statusEl.textContent='已识别 '+rows.length+' 行'+(uns.length?'（黄色行请复核）':'');
+      statusEl.className='ocr-status ok'; statusEl.textContent='已识别 '+rows.length+' 行'+(window.__skipped?('，跳过 '+window.__skipped+' 行没订的'):'')+(rows.some(function(r){return r.p==null||r.imp==null;})?'（黄色行请复核）':'');
       var gs=document.getElementById('grandStatus');
       fx(gs.classList.contains('ok')?'success':'warning');
       notify('识别完成：'+rows.length+' 行', window.__ivaMsg+'；'+gs.textContent.replace(/\s+/g,' ').trim());
