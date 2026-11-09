@@ -286,6 +286,8 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
 footer{margin-top:14px!important;}
 .photo-card .retry{display:block!important; width:100%; margin-top:5px; padding:7px 4px; font-size:.74rem; border-radius:10px; color:var(--accent); border-color:rgba(10,132,255,.45);}
 .photo-card .retry:disabled{opacity:.45;}
+
+.pbtn.retry-main{width:100%; flex:1 1 100%; padding:12px!important; font-size:.9rem!important; border-radius:14px; color:var(--accent); border-color:rgba(10,132,255,.55)!important;}
 </style>
 
 </head>
@@ -469,7 +471,7 @@ footer{margin-top:14px!important;}
     var card=document.createElement('div');
     card.className='photo-card';
     card.innerHTML='<img src="'+dataUrl+'"><button class="rm" title="移除">✕</button>'+
-      '<div class="ocr-status"></div><button class="retry" title="重新识别">↻ 重试识别</button><button class="dbg" title="查看模型原始返回">🔍 看返回</button>';
+      '<div class="ocr-status"></div>';
     card.__from=from||'相册/文件'; card.__src=dataUrl; card.__key=(from==='相机'?'cam':'ph')+Date.now()+Math.random().toString(36).slice(2);
     list.appendChild(card);
     card.querySelector('img').addEventListener('click',function(){
@@ -479,11 +481,12 @@ footer{margin-top:14px!important;}
     card.querySelector('.rm').addEventListener('click',function(){ card.remove(); });
     shrink(dataUrl,360).then(function(t){ card.__thumb=t; });
     var st=card.querySelector('.ocr-status');
-    card.querySelector('.dbg').addEventListener('click',function(){
-      var d=card.__diag||window.__diag||{};
-      alert('【'+(card.__from||'?')+'】\n'+(d.sent||'')+'\n\n模型返回('+(d.time||'')+')：\n'+(d.raw||'（还没有返回）'));
-    });
-    card.querySelector('.retry').addEventListener('click',function(){
+    var zone=document.querySelector('#'+pid+' .photo-btns');
+    var old=zone.querySelector('.retry-main'); if(old) old.remove();
+    var rb=document.createElement('button'); rb.type='button'; rb.className='pbtn retry-main'; rb.textContent='↻ 重新识别';
+    zone.appendChild(rb);
+    card.querySelector('.rm').addEventListener('click',function(){ rb.remove(); });
+    rb.addEventListener('click',function(){
       if(st.classList.contains('busy')) return;
       var has=document.querySelectorAll('#'+pid+' tbody tr[data-src="'+card.__key+'"]').length;
       if(has&&!confirm('重新识别会覆盖这张照片已识别的 '+has+' 行（包括你手改的内容），继续？')) return;
