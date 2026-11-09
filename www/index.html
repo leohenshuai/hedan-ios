@@ -278,6 +278,14 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
 
 .photo-card .dbg{display:block; width:100%; margin-top:4px; padding:5px 4px; font-size:.68rem; border-radius:10px; opacity:.8;}
 @media (prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important;}}
+
+/* v-ui: 底部操作区 + 重试按钮 */
+.controls{display:flex!important; flex-direction:column; align-items:stretch; gap:12px!important; margin:14px 0 8px!important;}
+.controls button.primary{width:100%; padding:13px 10px!important; font-size:.98rem!important; border-radius:16px!important; box-shadow:0 6px 18px rgba(10,111,224,.28);}
+.controls button.danger{align-self:center; width:auto!important; padding:7px 16px!important; font-size:.8rem!important; font-weight:500; background:transparent!important; border:1px solid rgba(255,69,58,.35)!important; color:var(--bad)!important; box-shadow:none!important; -webkit-backdrop-filter:none; backdrop-filter:none;}
+footer{margin-top:14px!important;}
+.photo-card .retry{display:block!important; width:100%; margin-top:5px; padding:7px 4px; font-size:.74rem; border-radius:10px; color:var(--accent); border-color:rgba(10,132,255,.45);}
+.photo-card .retry:disabled{opacity:.45;}
 </style>
 
 </head>
@@ -476,7 +484,9 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
       alert('【'+(card.__from||'?')+'】\n'+(d.sent||'')+'\n\n模型返回('+(d.time||'')+')：\n'+(d.raw||'（还没有返回）'));
     });
     card.querySelector('.retry').addEventListener('click',function(){
-      card.querySelector('.retry').classList.remove('show');
+      if(st.classList.contains('busy')) return;
+      var has=document.querySelectorAll('#'+pid+' tbody tr[data-src="'+card.__key+'"]').length;
+      if(has&&!confirm('重新识别会覆盖这张照片已识别的 '+has+' 行（包括你手改的内容），继续？')) return;
       sendToBackend(pid, null, st, dataUrl, card.__key);
     });
     sendToBackend(pid, dataUrl, st, dataUrl, card.__key);
