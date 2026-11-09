@@ -523,8 +523,7 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
     var q=num(pick('q','qty','quantity','cantidad'));
     var p=num(pick('p','price','unit','unitPrice','precio'));
     var imp=num(pick('imp','amount','total','importe','subtotal'));
-    if(q&&!p&&imp) p=Math.round(imp/q);
-    if(q&&p&&!imp) imp=Math.round(q*p);
+    // 单据金额必须是单据上原有的数，程序不推算（否则对照失效）
     return {d:String(pick('d','desc','description','name','producto')||''), q:q, p:p, imp:imp};
   }
   function shrink(dataUrl,max){
@@ -596,7 +595,7 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
    '6)版式：最左窄列是数量(手写，常写在品名左边)，中间列是单价，最右列是金额。先按列定位再读数，不要把单价和金额搞反。'+
    '7)数量(q)必须是单据上手写出来的数字，绝不能自己补 1 或估计。数量栏空白、写横线「-」「—」、或看不清时，q 填 null。'+
    '只有单价、没有数量的行，或金额栏写 STOCK / NO HAY / NO / 没有 / 缺货 的行，是「没订这件」，不要输出到 rows。'+
-   '数量和单价都有而金额看不清时，imp 才可以填 q×p；有数量和金额但单价看不清，p 填 imp÷q。'+
+   '金额(imp)必须是单据上手写的原数，看不清就填 null，绝对不要用 q×p 补；单价看不清 p 也填 null，不要用 imp÷q 推算。'+
    '8)完全空白、没写字迹的行不要输出。9)品名按单据原文，不要翻成中文。';
   function sendToBackend(pid, file, statusEl, dataUrl, srcKey){
     statusEl.className='ocr-status busy'; statusEl.textContent='AI 识别中…';
@@ -672,9 +671,9 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
     if(nums.length >= 3){
       q = nums[0]; p = nums[nums.length - 2]; imp = nums[nums.length - 1];
     } else if(nums.length === 2){
-      q = nums[0]; p = nums[1]; imp = q * p;
+      q = nums[0]; p = nums[1]; imp = null;
     } else {
-      q = nums[0]; p = 0; imp = 0;
+      q = nums[0]; p = 0; imp = null;
     }
     return { d: d, q: q, p: p, imp: imp };
   }
@@ -716,13 +715,13 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
 
   function recalcAll(){
     var grandCalc = 0;
-    var grandPrinted = parseFloat(document.getElementById('grandPrinted').value) || 0;
+    var grandPrintedSum = 0;
     var allOk = true;
     var anyRow = false;
 
     document.querySelectorAll('.ledger').forEach(function(wrap){
       var pid = wrap.id;
-      var pageCalc = 0;
+      var pageCalc = 0, pageImp = 0;
       wrap.querySelectorAll('tbody tr').forEach(function(tr){
         anyRow = true;
         var qInput = tr.querySelector('input.cell:nth-of-type(1), input[id$="-q"]');
@@ -735,6 +734,7 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
         var imp = impInput.value === '' ? null : (parseFloat(impInput.value) || 0);
         var calc = q * p;
         pageCalc += calc;
+        pageImp += (imp||0);
         calcCell.textContent = fmt.format(calc);
         tr.classList.toggle('iva', /^\s*iva\b/i.test(tr.querySelector('input.desc').value));
         tr.classList.remove('bad');
@@ -758,7 +758,8 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
       var printedTotalInput = document.getElementById(pid + '-printedTotal');
       var totalDiffCell = document.getElementById(pid + '-totalDiff');
       if(printedTotalInput && totalDiffCell){
-        var printedTotal = parseFloat(printedTotalInput.value) || 0;
+        printedTotalInput.value = pageImp; printedTotalInput.readOnly = true; grandPrintedSum += pageImp;
+        var printedTotal = pageImp;
         var totalDiff = pageCalc - printedTotal;
         if(totalDiff === 0){
           totalDiffCell.innerHTML = '<span class="badge ok">✓<span class="bt"> 相符</span></span>';
@@ -769,6 +770,7 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
       }
     });
 
+    var grandPrinted = grandPrintedSum; var gpEl = document.getElementById('grandPrinted'); gpEl.value = grandPrinted; gpEl.readOnly = true;
     document.getElementById('grandCalc').textContent = fmt.format(grandCalc);
     var __prevOk=window.__lastOk;
     var grandDiff = grandCalc - grandPrinted;
