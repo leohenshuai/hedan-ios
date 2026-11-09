@@ -302,7 +302,6 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
 
 <div class="controls">
   <button class="primary" id="addPageBtn">＋ 新增一页</button>
-  <button id="clearDiffBtn">单据金额 = 计算值</button>
 </div>
 
 <footer>数据与照片仅保存在本机。</footer>
@@ -626,12 +625,13 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
       var hasIva=(o.hasIva===true)||(ivaW!=null&&ivaW>0)||(tot>calc&&calc>0&&Math.abs(tot-calc*1.21)<=2);
       var ivaMsg;
       if(hasIva){
-        var calcIva=Math.round(calc*0.21), amt=(ivaW!=null&&ivaW>0)?ivaW:((tot>calc)?(tot-calc):calcIva);
+        var amt=(ivaW!=null&&ivaW>0)?ivaW:null;   // 只用单据上写的 IVA，不推算
         addRow(pid,{d:'IVA 21%',q:1,p:amt,imp:amt});
         var ir=tb.lastElementChild; ir.classList.add('iva'); if(srcKey) ir.dataset.src=srcKey;
-        var off=Math.abs(amt-calcIva)>1;
+        var off=(amt==null)||Math.abs(amt-Math.round(calc*0.21))>1;   // 仅用于提示
         
-        ivaMsg='有 IVA，已自动加入 '+fmt.format(amt)+(off?'（与 21% 不符，请复核）':'');
+        if(amt==null) ir.classList.add('warn');
+        ivaMsg=(amt==null)?'有 IVA 但单据上没读到金额，请手填':'有 IVA，已加入 '+fmt.format(amt)+(off?'（与 21% 不符，请复核）':'');
       } else { ivaMsg='单据没有 IVA'; }
       window.__ivaMsg=ivaMsg;
       var t=wrap.querySelector('.ledger-head input.title');
@@ -793,31 +793,6 @@ tbody tr.iva .badge{background:rgba(10,132,255,.22); color:var(--accent);}
   document.getElementById('addPageBtn').addEventListener('click', function(){
     var pid = newPage(0);
     addRow(pid, {d:'', q:'', p:'', imp:''});
-  });
-
-  document.getElementById('clearDiffBtn').addEventListener('click', function(){
-    document.querySelectorAll('.ledger').forEach(function(wrap){
-      var pid = wrap.id;
-      var pageCalc = 0;
-      wrap.querySelectorAll('tbody tr').forEach(function(tr){
-        var q = parseFloat(tr.querySelector('input[id$="-q"]').value) || 0;
-        var p = parseFloat(tr.querySelector('input[id$="-p"]').value) || 0;
-        var impInput = tr.querySelector('input[id$="-imp"]');
-        impInput.value = q * p;
-        pageCalc += q * p;
-      });
-      var pt = document.getElementById(pid + '-printedTotal');
-      if(pt) pt.value = pageCalc;
-    });
-    // 不要从显示文字反解（es-AR 的千分位是「.」，会把 954.600 读成 954.6），直接按各页数字累加
-    var gc = 0;
-    document.querySelectorAll('.ledger').forEach(function(w){
-      w.querySelectorAll('tbody tr').forEach(function(tr){
-        gc += (parseFloat(tr.querySelector('input[id$="-q"]').value)||0) * (parseFloat(tr.querySelector('input[id$="-p"]').value)||0);
-      });
-    });
-    document.getElementById('grandPrinted').value = gc;
-    recalcAll();
   });
 
   // If a Pyto session pre-seeded OCR text (one page per photo, raw text in the import box),
